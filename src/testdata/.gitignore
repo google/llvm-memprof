@@ -1,0 +1,17 @@
+*.dwp
+basic_type.cc
+embedded_type.cc
+padding_type.cc
+std_map_type.cc
+union_type.cc
+vector_type.cc
+array_access_count_test.cc
+array_type.cc
+simple_record_access_type.cc
+const_pointer_type.cc
+vector_unique_pointer_type.cc
+vector_function_type.cc
+simple_union_type.cc
+anonymous_union_type.cc
+std_optional_type.cc
+simple_union_type.cc

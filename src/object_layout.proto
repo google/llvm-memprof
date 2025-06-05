@@ -1,0 +1,172 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+edition = "2023";
+
+option features.field_presence = IMPLICIT;
+
+// A proto representing the layout of a C++ object in memory.
+// See `google3-runtime-expensive-new`.
+message ObjectLayout {
+  message Properties {
+    // The name of the object:
+    //  - For fields, this is the name of the field.
+    //  - For base classes, this is the name of the base type.
+    //  - For top-level objects, this is the type name.
+    //  - For unnamed objects (e.g. anonymous unions, lambdas), this is an
+    //    unspecified identifier, which typically points to the source location
+    //    for the object.
+    string name = 1;
+
+    // The name of the type. Demangled, with template parameters.
+    string type_name = 2;
+
+    enum ObjectKind {
+      UNKNOWN = 0;
+
+      // A virtual pointer.
+      VPTR = 1;
+
+      // A base class.
+      BASE = 2;
+
+      // A field.
+      FIELD = 3;
+
+      // Some padding.
+      PADDING = 4;
+
+      // A virtual base class.
+      VIRTUAL_BASE = 5;
+
+      // An element of an array. This element is a bit special: for efficiency,
+      // it is represented as a single subobject with multiplicity `n`, where
+      // `n` is the number of elements in the array.
+      ARRAY_ELEMENTS = 6;
+    }
+
+    ObjectKind kind = 3;
+
+    enum TypeKind {
+      UNKNOWN_TYPE = 0;
+
+      // A record (class, struct).
+      RECORD_TYPE = 1;
+
+      // An enum.
+      ENUM_TYPE = 2;
+
+      // An indirection (pointer, reference).
+      INDIRECTION_TYPE = 3;
+
+      // An array.
+      ARRAY_TYPE = 4;
+
+      // A builtin type (int, long, ...).
+      BUILTIN_TYPE = 5;
+
+      // Padding.
+      PADDING_TYPE = 6;
+    }
+
+    TypeKind type_kind = 4;
+
+    // The size of the object, including tail padding.
+    // Note that this is contextual: this always includes the tail padding for a
+    // root object, but for subobjects this does not include the tail padding
+    // when it is reused by the compiler to fit subsequent objects. For example,
+    // in:
+    //   struct S1 {
+    //     int64_t a;
+    //     int32_t b;
+    //   };
+    // `S1` has 32 bits of tail padding after `b`, and `S1.size_bits` is `16 *
+    // 8`.
+    //  However, in:
+    //   struct S2 : public S1 {
+    //     int32_t c;
+    //   };
+    // The compiler is able to fit `c` in the tail padding of `S1`, so
+    // `S1.size_bits` is `12 * 8`.
+    // If tail padding is present, the size of the tail padding is the
+    // `padding_size` of the last subobject.
+    // For objects of kind `ARRAY_ELEMENTS`, this is the size of a single
+    // element.
+    int64 size_bits = 5;
+
+    // For objects of kind `ARRAY_ELEMENTS`, the number of elements. `1` for
+    // other object kinds.
+    int64 multiplicity = 6;
+
+    // The natural alignment of the type. Note that this is not always the same
+    // as the alignment of a subobject of that type:
+    //   - A subobject can be aligned less, e.g. when part of a packed object.
+    //   - A subobject can be aligned more, e.g. when using
+    //   ABSL_CACHELINE_ALIGNED
+    //     on the corresponding field declaration.
+    int64 align_bits = 7;
+
+    // The offset of the subobject within the parent object. `0` for the root
+    // object.
+    int64 offset_bits = 8;
+
+    // Whether the type is a protobuf.
+    bool is_proto = 9;
+
+    // Whether the type is a POD in the sense of c++03:
+    // https://en.cppreference.com/w/cpp/named_req/PODType
+    bool is_pod_cpp03 = 10;
+
+    message SourceLocation {
+      string path = 1;
+      int64 line_number = 2;
+    }
+    // The source location where the object type was defined, when it exists.
+    // For builtin types (e.g. `int`), this is not populated.
+    SourceLocation type_location = 11;
+  }
+
+  Properties properties = 15;
+
+  // The recursive layout of subobjects (base classes, fields, and padding).
+  // Note that for bit fields, we generate one subobject for each bit field,
+  // which allows differentating them even though they do not have a proper
+  // address: C++ uses byte-addressing, which forces c++ to have special
+  // handling for bit fields. In our case, because we use bit-addressable
+  // subobjects, we are able to make that distinction.
+  repeated ObjectLayout subobjects = 3;
+
+  // A summary of the data including subobjects.
+  // This data is redundant with the data in `subobjects`. It's just a
+  // convenient presentation of some of that data for easy access using SQL.
+  message Summary {
+    // The total amount of padding in this object or its subobjects.
+    int64 total_padding_bits = 1;
+
+    // The total number of vptrs in this object or its subobjects.
+    int64 total_vptrs = 2;
+  }
+
+  Summary summary = 16;
+
+  // A possible more efficient replacement for this type.
+  message Replacement {
+    string type_name = 1;
+    int64 size_bits = 2;
+  }
+
+  Replacement replacement = 6;
+
+  reserved 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14;
+}

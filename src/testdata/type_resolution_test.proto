@@ -1,0 +1,70 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package testdata;
+
+// Simple Record message.
+message Record {
+  int32 id = 1;
+  string name = 2;
+}
+
+// Example of an enum.
+enum Corpus {
+  UNIVERSAL = 0;
+  WEB = 1;
+  IMAGES = 2;
+  LOCAL = 3;
+  NEWS = 4;
+  PRODUCTS = 5;
+  VIDEO = 6;
+}
+
+// Example of a nested message.
+message Result {
+  string url = 1;
+  string title = 2;
+  repeated string snippets = 3;
+}
+
+// Main message demonstrating various features.
+message SearchRequest {
+  string query = 1;
+  int32 page_number = 2;  // Which page number do we want?
+  int32 result_per_page = 3 [deprecated = true];  // Number of results per page.
+
+  Corpus corpus = 4;
+
+  // Example of a repeated field.
+  repeated Result results = 5;
+
+  // Example of a map.
+  map<string, string> metadata = 6;
+
+  // Example of a oneof.
+  oneof test_oneof {
+    string name = 7;
+    int32 id = 8;
+  }
+
+  // Reserved field numbers and names
+  reserved 9, 10, 11 to 15;
+  reserved "foo", "bar";
+}
+
+message SearchResponse {
+  map<int32, Result> results_by_page = 1;
+}
