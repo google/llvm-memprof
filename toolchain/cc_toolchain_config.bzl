@@ -33,30 +33,31 @@ all_link_actions = [
 ]
 
 def _impl(ctx):
+    LLVM_ROOT = ctx.var["LLVM_ROOT"]
     tool_paths = [
         tool_path(
             name = "gcc",
-            path = "/usr/llvm-memprof/bin/clang",
+            path = LLVM_ROOT + "/build/bin/clang",
         ),
         tool_path(
             name = "clang",
-            path = "/usr/llvm-memprof/bin/clang",
+            path =  LLVM_ROOT + "/build/bin/clang",
         ),
         tool_path(
             name = "clang++",
-            path = "/usr/llvm-memprof/bin/clang++",
+            path =  LLVM_ROOT + "/build/bin/clang++",
         ),
         tool_path(
             name = "cpp",
-            path = "/usr/llvm-memprof/bin/clang++",
+            path =  LLVM_ROOT + "/build/bin/clang++",
         ),
         tool_path(
             name = "ar",
-            path = "/usr/llvm-memprof/bin/llvm-ar",
+            path =  LLVM_ROOT + "/build/bin/llvm-ar",
         ),
         tool_path(
             name = "ld",
-            path = "/usr/llvm-memprof/bin/lld",
+            path =  LLVM_ROOT + "/build/bin/lld",
         ),
         tool_path(
             name = "gcov",
@@ -97,11 +98,11 @@ def _impl(ctx):
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
-        features = features,
         cxx_builtin_include_directories = [
-            "/usr/local/google/home/weingartenmatt/heapalloc-type-resolver/third_party/llvm-project/build/lib/",
+            LLVM_ROOT + "/build/lib/",
             "/usr/include",
         ],
+        features = features,
         toolchain_identifier = "local",
         host_system_name = "local",
         target_system_name = "local",

@@ -13,16 +13,17 @@
 # limitations under the License.
 
 #!/bin/bash
-export TOP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export TOP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
+# Subdirs
 export SCRIPTS_DIR="${TOP_DIR}/scripts"
 export FLAMEGRAPH_DIR="${TOP_DIR}/third_party/FlameGraph"
-export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin/"
-# export SPEC_DIR="<local-spec-install>"
+export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin"
 
-alias clang="${LLVM_BIN_DIR}/clang"
-alias clang++="${LLVM_BIN_DIR}/clang++"
-alias llvm-dwarfdump="${LLVM_BIN_DIR}/llvm-dwarfdump"
-alias llvm-profdata="${LLVM_BIN_DIR}/llvm-profdata"
 
-source "${TOP_DIR}/.venv/bin/activate"
+export PATH="${LLVM_BIN_DIR}:${PATH}"
+
+# Pthon venc
+if [ -f "${TOP_DIR}/.venv/bin/activate" ]; then
+  source "${TOP_DIR}/.venv/bin/activate"
+fi

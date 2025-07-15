@@ -87,10 +87,19 @@ ninja -j"$(nproc)"
 popd >/dev/null
 popd >/dev/null
 
-# This step is required to make the bazel build cross toolchain work with
-# local llvm install in third_party
-log "Linking LLVM build for Bazel toolchain..."
-sudo ln -sfn "${TOP_DIR}/third_party/llvm-project/build/" /usr/llvm-memprof
+# Setting up .bazelrc
+log "Writing Bazel configuration to .bazelrc"
+
+bazelrc="${TOP_DIR}/.bazelrc"
+cat > "${bazelrc}" <<EOF
+# Use our custom C/C++ toolchain suite by default
+build --crosstool_top=//toolchain:clang_suite
+
+# Point LLVM_ROOT to our local llvm-project checkout
+build --define LLVM_ROOT=${TOP_DIR}/third_party/llvm-project
+EOF
+
+log "Wrote Bazel config to ${bazelrc}"
 
 
 # Setting up python venv
