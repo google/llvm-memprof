@@ -1,0 +1,11 @@
+[submodule "third_party/FlameGraph"]
+	path = third_party/FlameGraph
+	url = git@github.com:mattweingarten/FlameGraph.git
+[submodule "third_party/llvm-project"]
+	path = third_party/llvm-project
+	url = git@github.com:mattweingarten/llvm-project.git
+	branch = heapalloc
+[submodule "third_party/abseil-cpp"]
+	path = third_party/abseil-cpp
+	url = git@github.com:mattweingarten/abseil-cpp.git
+	branch = heapalloc

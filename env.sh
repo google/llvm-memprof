@@ -24,3 +24,5 @@ alias clang="${LLVM_BIN_DIR}/clang"
 alias clang++="${LLVM_BIN_DIR}/clang++"
 alias llvm-dwarfdump="${LLVM_BIN_DIR}/llvm-dwarfdump"
 alias llvm-profdata="${LLVM_BIN_DIR}/llvm-profdata"
+
+source "${TOP_DIR}/.venv/bin/activate"

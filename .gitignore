@@ -1,0 +1,36 @@
+/bazel-*
+
+cmake/.idea
+cmake/cmake-build-debug/
+
+# Common build subdirectories.
+.build/
+_build/
+
+# Visual Studio 2017
+.vs
+
+# Visual Studio Code
+/.vscode/
+
+# IntelliJ
+.idea
+*.iml
+
+# Eclipse
+**/.settings
+**/.project
+**/.classpath
+
+#Python
+__pycache__/
+.venv/
+
+
+# Clangd uses these common ephemeral files
+.cache
+compile_commands.json
+
+# Ignore Bzlmod for now
+MODULE.bazel.lock
+MODULE.bazel
