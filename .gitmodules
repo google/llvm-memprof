@@ -9,3 +9,6 @@
 	path = third_party/abseil-cpp
 	url = git@github.com:mattweingarten/abseil-cpp.git
 	branch = heapalloc
+[submodule "third_party/fleetbench"]
+	path = third_party/fleetbench
+	url = git@github.com:google/fleetbench.git
