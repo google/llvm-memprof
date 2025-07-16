@@ -97,6 +97,9 @@ build --crosstool_top=//toolchain:clang_suite
 
 # Point LLVM_ROOT to our local llvm-project checkout
 build --define LLVM_ROOT=${TOP_DIR}/third_party/llvm-project
+
+# Use C++20 standard
+build --cxxopt="-std=c++20"
 EOF
 
 log "Wrote Bazel config to ${bazelrc}"
