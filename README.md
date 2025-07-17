@@ -9,7 +9,7 @@ This tool is an offline analysis tool for memory profiling aimed to support prof
 
 ## Setup
 
-A setup script is provided. We assume [bazel is installed](https://bazel.build/install). Simply run `bash init.sh`. This script initializes all the submodules, builds an llvm with memprof and heapalloc enabled. The script also builds all the inputs for type resolver tests. This step may take a few hours. 
+A setup script is provided. Simply run `bash init.sh`. This repo relies on [bazel 6.4.0 is installed](https://bazel.build/install).  This script initializes all the submodules, builds an llvm with memprof and heapalloc enabled. The script also builds all the inputs for type resolver tests. This step may take a few hours. 
 
 Once the `init.sh` script is complete, source the `env.sh` file with
 
