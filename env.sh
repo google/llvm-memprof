@@ -23,7 +23,7 @@ export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin"
 
 export PATH="${LLVM_BIN_DIR}:${PATH}"
 
-# Pthon venc
+# Python venv
 if [ -f "${TOP_DIR}/.venv/bin/activate" ]; then
   source "${TOP_DIR}/.venv/bin/activate"
 fi
