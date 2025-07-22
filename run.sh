@@ -81,6 +81,19 @@ spec_workloads=(
   "508.namd_r"
   "510.parest_r"
 )
+build_spec(){
+  echo "Building SPEC..."
+  cp "${TOP_DIR}/cfg/memprof.cfg" "${SPEC_DIR}/config/memprof.cfg"
+  cd $SPEC_DIR
+  source shrc
+  for workload in "${spec_workloads[@]}"; do
+    echo "Building workload: $workload"
+    build_cmd="runcpu --config=memprof --action=build ${workload}"
+    echo ${build_cmd}
+    ${build_cmd}
+    
+  done
+}
 run_spec() {
   echo "Processing SPEC workloads..."
   for workload in "${spec_workloads[@]}"; do
@@ -204,6 +217,7 @@ function show_help() {
   echo "Usage: $0 [OPTIONS]"
   echo "Options:"
   echo "  --all         Run all workload categories (spec, clang, fleetbench, folly)."
+  echo "  --build-spec  Build SPEC workloads."
   echo "  --spec        Run SPEC workloads."
   echo "  --clang       Run CLANG workloads."
   echo "  --fleetbench  Run Fleetbench workloads."
@@ -231,6 +245,7 @@ function show_help() {
 
 
 #======MAIN====================================================================: 
+[[ -n "${TOP_DIR:-}" ]] || { echo "ERROR: TOP_DIR empty. Are you sure you sourced the environment? (source env.sh)" >&2; exit 1; }
 
 current_datetime=$(date "+%Y-%m-%d_%H-%M-%S")
 curr_experiment="${current_datetime}"
@@ -244,6 +259,7 @@ echo "$OUT"
 
 # Process command-line arguments
 run_all=false
+build_spec_flag=false
 run_spec_flag=false
 run_clang_flag=false
 run_fleetbench_flag=false
@@ -257,6 +273,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --all)
       run_all=true
+      ;;
+    --build-spec)
+      build_spec_flag=true
       ;;
     --spec)
       run_spec_flag=true
@@ -311,6 +330,9 @@ if $run_all; then
 elif $run_spec_flag; then
   echo "Running SPEC workloads."
   run_spec "${selected_benchmarks[@]}"
+elif $build_spec_flag; then
+  echo "Building SPEC and getting memprof."
+  build_spec
 elif $run_clang_flag; then
   echo "Running CLANG workloads."
   run_clang "${selected_benchmarks[@]}"

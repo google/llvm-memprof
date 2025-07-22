@@ -19,6 +19,40 @@ if [ -z "$TOP_DIR" ]; then
     exit 1
 fi
 
+
+skip_llvm=false
+
+show_help() {
+  cat <<EOF
+Usage: $0 [options]
+
+Options:
+  -L, --no-llvm      Skip building the local LLVM/Clang toolchain
+  -h, --help         Show this help message and exit
+
+Without --no-llvm, this script will build LLVM/Clang under
+third_party/llvm-project/build.
+EOF
+  exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -L|--no-llvm)
+      skip_llvm=true
+      shift
+      ;;
+    -h|--help)
+      show_help
+      ;;
+    *)
+      echo "Error: Unknown option '$1'"
+      show_help
+      ;;
+  esac
+done
+
+
 log() {
     echo "[INFO] $*"
 }
@@ -44,6 +78,7 @@ build-essential \
 python3 \
 python3-distutils \
 python3-venv \
+python3-pip \
 git \
 libedit-dev \
 libffi-dev \
@@ -51,7 +86,8 @@ libxml2-dev \
 zlib1g-dev \
 libncurses5-dev \
 libtinfo-dev \
-pkg-config
+pkg-config \
+selinux-utils
 
 # Install bazel
 log "Adding Bazel GPG key and repository..."
@@ -59,15 +95,20 @@ curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel-arc
 sudo mv bazel-archive-keyring.gpg /usr/share/keyrings
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] \
 https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-| sudo tee /etc/apt/sources.list.d/bazel.list >/dev/null
+| sudo tee /etc/apt/sources.list.d/bazel.list >/dev/n   ull
 
 log "Updating apt (with Bazel repo)..."
 sudo apt update
 
 log "Installing Bazel (6.4.0)..."
 sudo apt install -y bazel-6.4.0
+sudo ln -sf /usr/bin/bazel-6.4.0 /usr/local/bin/bazel
+
+log "Found bazel: $(bazel --version)"
+
 
 # Build local llvm. This is also used in the bazel toolchain.
+if [ "$skip_llvm" = false ]; then
 log "Building local LLVM/Clang toolchain..."
 pushd "${TOP_DIR}/third_party/llvm-project/" >/dev/null
 mkdir -p build
@@ -75,17 +116,24 @@ pushd build >/dev/null
 cmake -GNinja \
 -DLLVM_ENABLE_PROJECTS="clang;compiler-rt;lld" \
 -DCMAKE_LINKER="lld" \
--DLLVM_ENABLE_LLD=On \
 -DCMAKE_INSTALL_PREFIX="$(pwd)/install" \
 -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_C_COMPILER=/usr/bin/clang \
 -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+-DCMAKE_C_FLAGS="-O2 -g" \
+-DCMAKE_CXX_FLAGS="-O2 -g" \
+-DLLVM_ENABLE_LLD=On \
 -DLLVM_TARGETS_TO_BUILD=host \
 ../llvm
+
+log "Starting LLVM build (make take a while)..."
 
 ninja -j"$(nproc)"
 popd >/dev/null
 popd >/dev/null
+else
+  log "Skipping LLVM build ( --no-llvm passed )"
+fi
 
 # Setting up .bazelrc
 log "Writing Bazel configuration to .bazelrc"

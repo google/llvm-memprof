@@ -1,0 +1,40 @@
+name: llvm-memprof CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+ build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build and Unit Tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "==> Running init.sh"
+        ./init.sh --no-llvm
+        source env.sh
+        bazel --version
+    - name: DwarfMetadata Fetcher Test
+      run: |
+        bazel run //src:dwarf_metadata_fetcher_test
+
+    # echo "==> Sourcing env.sh"
+    # source ./env.sh
+
+    # echo "==> Dwarf Metadata Fetcher Test"
+    # bazel run //src:dwarf_metadata_fetcher_test
+
+    # echo "==> Type Resolver Test"
+    # bazel run //src:type_resolver_test
+
+    # echo "==> Histogram Builder Test"
+    # bazel run //src:histogram_builder_test

@@ -20,6 +20,8 @@ export SCRIPTS_DIR="${TOP_DIR}/scripts"
 export FLAMEGRAPH_DIR="${TOP_DIR}/third_party/FlameGraph"
 export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin"
 
+#Change open file limit.
+ulimit -n 65535
 
 export PATH="${LLVM_BIN_DIR}:${PATH}"
 
