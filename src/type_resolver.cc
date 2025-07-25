@@ -140,10 +140,14 @@ constexpr absl::string_view kABSLContainerBtreeTypes[] = {
 constexpr absl::string_view kSpecialAllocatingFunctions[] = {
     "std::get_temporary_buffer",
     "std::__u::get_temporary_buffer",
+    "__gnu_cxx::get_temporary_buffer",
 };
 
 constexpr absl::string_view kAllocatorWrappers[] = {
-    "std::allocator", "std::__u::allocator", "std::__new_allocator",
+    "std::allocator",
+    "std::__u::allocator",
+    "std::__new_allocator",
+    "__gnu_cxx::new_allocator",
     "muppet::instant::PolymorphicAllocator",
     "xalanc_1_10::MemoryManagedConstructionTraits"};
 

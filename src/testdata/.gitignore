@@ -1,4 +1,5 @@
 *.dwp
+*.dwarf
 basic_type.cc
 embedded_type.cc
 padding_type.cc

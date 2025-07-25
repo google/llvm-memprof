@@ -930,20 +930,19 @@ TEST(TypeResolverTest, VectorUniquePointerTest) {
 
   // std::vector<std::unique_ptr<A>> As;
   // request size does not matter for this test.
-  ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<TypeTree> type_tree,
-      type_resolver->ResolveTypeFromResolutionStrategy(
-          DwarfTypeResolver::ContainerResolutionStrategy(
-              "std::vector",
-              "_ZNSt15__new_allocatorISt10unique_ptrI1ASt14default_deleteIS1_"
-              "EEE8allocateEmPKv",
-              DwarfTypeResolver::ContainerResolutionStrategy::
-                  kAllocatorAllocate),
-          {DwarfMetadataFetcher::Frame(
-              "_ZNSt15__new_allocatorISt10unique_ptrI1ASt14default_deleteIS1_"
-              "EEE8allocateEmPKv",
-              kDummyLineColNo, kDummyLineColNo)},
-          /*request_size=*/-1));
+  ASSERT_OK_AND_ASSIGN(std::unique_ptr<TypeTree> type_tree,
+                       type_resolver->ResolveTypeFromResolutionStrategy(
+                           DwarfTypeResolver::ContainerResolutionStrategy(
+                               "std::vector",
+                               "_ZN9__gnu_cxx13new_allocatorISt10unique_"
+                               "ptrI1ASt14default_deleteIS2_EEE8allocateEmPKv",
+                               DwarfTypeResolver::ContainerResolutionStrategy::
+                                   kAllocatorAllocate),
+                           {DwarfMetadataFetcher::Frame(
+                               "_ZN9__gnu_cxx13new_allocatorISt10unique_"
+                               "ptrI1ASt14default_deleteIS2_EEE8allocateEmPKv",
+                               kDummyLineColNo, kDummyLineColNo)},
+                           /*request_size=*/-1));
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
   EXPECT_EQ(type_tree->Name(), "std::unique_ptr<A, std::default_delete<A> >");
 }
@@ -967,18 +966,19 @@ TEST(TypeResolverTest, VectorFunctionTypeTest) {
 
   // std::vector<std::function<void (const A &, int)>> As;
   // request size does not matter for this test.
-  ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<TypeTree> type_tree,
-      type_resolver->ResolveTypeFromResolutionStrategy(
-          DwarfTypeResolver::ContainerResolutionStrategy(
-              "std::vector",
-              "_ZNSt15__new_allocatorISt8functionIFvRK1AiEEE8allocateEmPKv",
-              DwarfTypeResolver::ContainerResolutionStrategy::
-                  kAllocatorAllocate),
-          {DwarfMetadataFetcher::Frame(
-              "_ZNSt15__new_allocatorISt8functionIFvRK1AiEEE8allocateEmPKv",
-              kDummyLineColNo, kDummyLineColNo)},
-          /*request_size=*/-1));
+  ASSERT_OK_AND_ASSIGN(std::unique_ptr<TypeTree> type_tree,
+                       type_resolver->ResolveTypeFromResolutionStrategy(
+                           DwarfTypeResolver::ContainerResolutionStrategy(
+                               "std::vector",
+                               "_ZN9__gnu_cxx13new_"
+                               "allocatorISt8functionIFvRK1AiEEE8allocateEmPKv",
+                               DwarfTypeResolver::ContainerResolutionStrategy::
+                                   kAllocatorAllocate),
+                           {DwarfMetadataFetcher::Frame(
+                               "_ZN9__gnu_cxx13new_"
+                               "allocatorISt8functionIFvRK1AiEEE8allocateEmPKv",
+                               kDummyLineColNo, kDummyLineColNo)},
+                           /*request_size=*/-1));
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
   EXPECT_EQ(type_tree->Name(), "std::function<void (const A &, int)>");
 }
@@ -1006,12 +1006,12 @@ TEST(TypeResolverTest, ConstPointerTest) {
       std::unique_ptr<TypeTree> type_tree,
       type_resolver->ResolveTypeFromResolutionStrategy(
           DwarfTypeResolver::ContainerResolutionStrategy(
-              "std::vector", "_ZNSt15__new_allocatorIPK1AE8allocateEmPKv",
+              "std::vector", "_ZN9__gnu_cxx13new_allocatorIPK1AE8allocateEmPKv",
               DwarfTypeResolver::ContainerResolutionStrategy::
                   kAllocatorAllocate),
           {DwarfMetadataFetcher::Frame(
-              "_ZNSt15__new_allocatorIPK1AE8allocateEmPKv", kDummyLineColNo,
-              kDummyLineColNo)},
+              "_ZN9__gnu_cxx13new_allocatorIPK1AE8allocateEmPKv",
+              kDummyLineColNo, kDummyLineColNo)},
           /*request_size=*/-1));
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
   EXPECT_EQ(type_tree->Name(), "A*");

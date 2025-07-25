@@ -21,13 +21,35 @@
 readonly TESTDATA_PATH="${TOP_DIR}/src/testdata"
 
 readonly MEMPROF_FLAGS=" -fuse-ld=lld -Wl,--no-rosegment \
--fno-exceptions -fdebug-info-for-profiling -fPIC\
+-fno-exceptions -fdebug-info-for-profiling -fPIC \
 -mno-omit-leaf-frame-pointer \
 -fno-omit-frame-pointer -fno-optimize-sibling-calls \
 -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile \
 -mllvm -memprof-use-callbacks=true -mllvm -memprof-histogram"
 
-readonly CC_FLAGS="-g -gdwarf-5  -fuse-ld=lld -Wl,-build-id"
+# readonly CC_FLAGS="\
+#   -std=c++20 \
+#   -stdlib=libc++ \
+#   -nostdinc++ \
+#   -g -gdwarf-5 \
+#   -fuse-ld=lld \
+#   -Wl,-build-id \
+#   -isystem ${TOP_DIR}/third_party/llvm-project/build/include \
+#   -I${TOP_DIR}/third_party/llvm-project/libcxx/include \
+#   -I${TOP_DIR}/third_party/llvm-project/libcxxabi/include \
+#   -L${TOP_DIR}/third_party/llvm-project/libcxxabi/lib \
+#   -L${TOP_DIR}/third_party/llvm-project/build/lib \
+#   -Wl,-rpath,${TOP_DIR}/third_party/llvm-project/libcxxabi/lib"
+readonly CC_FLAGS="\
+  -std=c++20 \
+  -stdlib=libstdc++ \
+  -g -gdwarf-5 \
+  -fuse-ld=lld \
+  -Wl,-build-id \
+  -L${TOP_DIR}/third_party/llvm-project/build/lib \
+  -Wl,-rpath,${TOP_DIR}/third_party/llvm-project/build/lib \
+"
+
 
 set -e
 set -x
@@ -41,7 +63,14 @@ function compile_and_cp () {
 }
 
 function compile_proto () {
-  eval "bazel build //src/testdata:$1 --features=-simple_template_names -c dbg --copt=-O0"
+  eval "bazel build //src/testdata:$1 \
+        --features=-simple_template_names \
+        -c dbg \
+        --copt=-O0 \
+        --copt=-g \
+        --copt=-gdwarf-5 \
+        --copt=-ggdb \
+        --strip=never"
   rm -rf ${TESTDATA_PATH}/$1.dwp || true
   cp bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.dwp || true
 }
@@ -333,6 +362,7 @@ public:
 };
 int main(int argc, char **argv) {
   std::vector<std::unique_ptr<A>> As;
+  As.push_back(std::make_unique<A>());
 }
 EOF
 }
