@@ -15,9 +15,13 @@
 
 #!/bin/bash
 
+log() {
+    echo "[INFO] $*"
+}
+
 function extract_workload_name() {
   local workload_string="$1"
-  echo "${workload_string##*.}"
+  log "${workload_string##*.}"
 }
 
 function is_workload_selected() {
@@ -47,62 +51,80 @@ function process_workload_memory_profiles() {
     local full_command="$base_command \"$binary_path\" --memprof_profile \"$profile_file\" --verify_verbose"
 
     local typetree="$OUT/${workload}.typetree"
-    echo "$full_command --verify_verbose 2> $OUT/${workload}.verbose 1>  $typetree"
+    log "$full_command --verify_verbose 2> $OUT/${workload}.verbose 1>  $typetree"
     eval "$full_command --verify_verbose 2> $OUT/${workload}.verbose 1>  $typetree"
     eval "cat $OUT/${workload}.verbose | grep '====== Statistics ======' -A 14 > $OUT/${workload}.stats"
 
-    echo "llvm-profdata show $profile_file \
+    log "llvm-profdata show $profile_file \
     --profiled-binary=$binary_path --memory > $OUT/${workload}.profdata"
     eval "llvm-profdata show $profile_file \
     --profiled-binary=$binary_path --memory > $OUT/${workload}.profdata"
 
-    echo "$full_command --dump_unresolved_callstacks  1>  $OUT/${workload}.unresolved 2> /dev/null"
+    log "$full_command --dump_unresolved_callstacks  1>  $OUT/${workload}.unresolved 2> /dev/null"
     eval "$full_command --dump_unresolved_callstacks  1>  $OUT/${workload}.unresolved 2> /dev/null"
 
-    echo "python3 ${SCRIPTS_DIR}/flamegraph.py $typetree | $FLAMEGRAPH_DIR/flamegraph.pl > $OUT/${workload}.svg"
+    log "python3 ${SCRIPTS_DIR}/flamegraph.py $typetree | $FLAMEGRAPH_DIR/flamegraph.pl > $OUT/${workload}.svg"
     eval "python3 ${SCRIPTS_DIR}/flamegraph.py --max 10 $typetree | $FLAMEGRAPH_DIR/flamegraph.pl > $OUT/${workload}_10.svg"
     eval "python3 ${SCRIPTS_DIR}/flamegraph.py --max 50 $typetree | $FLAMEGRAPH_DIR/flamegraph.pl > $OUT/${workload}_50.svg"
     eval "python3 ${SCRIPTS_DIR}/flamegraph.py --max 200 $typetree | $FLAMEGRAPH_DIR/flamegraph.pl > $OUT/${workload}_200.svg"
 
-    echo "  -----------------------------------------"
+    log "  -----------------------------------------"
   done
 
-  echo "Finished processing workload: $workload"
+  log "Finished processing workload: $workload"
   cat $OUT/${workload}.stats
-  echo "========================================="
+  log "========================================="
 }
 
 
 
  # ============SPEC====================
 spec_workloads=(
-  "541.leela_r"
-  "523.xalancbmk_r"
   "508.namd_r"
   "510.parest_r"
+  "520.omnetpp_r"
+  "523.xalancbmk_r"
+  "541.leela_r"
 )
 build_spec(){
-  echo "Building SPEC..."
+  log "Building SPEC..."
+
+  # Get rid of nusance code that prevents building with clang. Clang has no flag that will accept this error...
+  find "${SPEC_DIR}" \( -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+    -exec sed -i "s|(s\.c_str() != '\\\\0') || (\*endptr == '\\\\0')|(!s.empty() || (*endptr == '\\0'))|g" {} +
+
+  # Copy cfg into spec directory
   cp "${TOP_DIR}/cfg/memprof.cfg" "${SPEC_DIR}/config/memprof.cfg"
+
+  # Replace LLVM_PATH in memprof.cfg with absolute path of this repo
+  sed -i "s|^[[:space:]]*LLVM_PATH[[:space:]]*=.*|LLVM_PATH = ${TOP_DIR}/third_party/llvm-project/|" "${SPEC_DIR}/config/memprof.cfg"
+
   cd $SPEC_DIR
   source shrc
   for workload in "${spec_workloads[@]}"; do
-    echo "Building workload: $workload"
-    build_cmd="runcpu --config=memprof --action=build ${workload}"
-    echo ${build_cmd}
+    log "Scrub workload: $workload"
+    build_cmd="runcpu --config=memprof --action=scrub ${workload}"
+    log ${build_cmd}
     ${build_cmd}
-    
+    log "Building workload: $workload"
+    build_cmd="runcpu --config=memprof --action=build ${workload}"
+    log ${build_cmd}
+    ${build_cmd}
+    log "Running and collecting memory profiles for: $workload"
+    build_cmd="runcpu --config=memprof --action=run --size=test ${workload}"
+    log ${build_cmd}
+    ${build_cmd}
   done
 }
 run_spec() {
-  echo "Processing SPEC workloads..."
+  log "Processing SPEC workloads..."
   for workload in "${spec_workloads[@]}"; do
     is_workload_selected "${workload}" "$@"
     local is_selected=$?
     if [[ "${is_selected}" -ne 0 ]]; then
       continue
     fi
-    echo "Processing workload: $workload"
+    log "Processing workload: $workload"
     workload_name=$(extract_workload_name "$workload")
 
     if [[ "${workload_name}" == xalancbmk* ]]; then
@@ -114,7 +136,7 @@ run_spec() {
     
     process_workload_memory_profiles "$profile_dir" "$workload_name" "$binary_path"
   done
-  echo "Finished processing all specified SPEC workloads."
+  log "Finished processing all specified SPEC workloads."
 }
 
 
@@ -128,19 +150,19 @@ clang_workloads=(
 
 run_clang() {
   local selected_benchmarks="$1"
-  echo "Processing CLANG workloads..."
+  log "Processing CLANG workloads..."
   for workload in "${clang_workloads[@]}" ; do
     is_workload_selected "${workload}" "$@"
     local is_selected=$?
     if [[ "${is_selected}" -ne 0 ]]; then
       continue
     fi
-    echo "Processing CLANG workload: $workload"
+    log "Processing CLANG workload: $workload"
     dir="${TOP_DIR}/integration_tests/clang/tests/${workload}"
     binary="${TOP_DIR}/${workload}"
     process_workload_memory_profiles "$dir"  "$workload" "$binary"
   done
-  echo "Finished processing CLANG workloads."
+  log "Finished processing CLANG workloads."
 }
 
 # ============Fleetbench====================
@@ -167,7 +189,7 @@ fleet_bench_build_target=(
 )
 
 function run_fleetbench() {
-  echo "Processing Fleetbench workloads..."
+  log "Processing Fleetbench workloads..."
   for i in "${!fleetbench_workloads[@]}"; do
 
     workload="${fleetbench_workloads[$i]}"
@@ -179,65 +201,65 @@ function run_fleetbench() {
     fi
     # Step 1: Build and Run Fleetbench workload with Memprof
     rm /tmp/memprof.profraw.*
-    BUILD_FLEETBENCH_CMD="blaze run --fission=no --strip=never --config=memprof \
+    BUILD_FLEETBENCH_CMD="bazel run --fission=no --strip=never  \
     -c dbg --fdo_instrument=/tmp \
     --copt=-g --copt=-fdebug-info-for-profiling --copt=-O0 \
     --copt=-mllvm --copt=-memprof-histogram --copt=-fdebug-info-for-profiling \
     --copt=-mno-omit-leaf-frame-pointer --copt=-fno-omit-frame-pointer --features=-simple_template_names \
     --copt=-fno-optimize-sibling-calls --copt=-m64 --copt=-Wl,--copt=-build-id \
     --copt=-no-pie third_party/fleetbench/${build_target}:${workload}"
-    echo "Building Fleetbench workload: ${workload}:"
-    echo "$BUILD_FLEETBENCH_CMD"
+    log "Building Fleetbench workload: ${workload}:"
+    log "$BUILD_FLEETBENCH_CMD"
     eval "$BUILD_FLEETBENCH_CMD"
     rm -rf /tmp/${workload}
-    cp blaze-bin/third_party/fleetbench/${build_target}/${workload} /tmp/${workload}
+    cp bazel-bin/third_party/fleetbench/${build_target}/${workload} /tmp/${workload}
     
     # Step 2: Process the workload memory profiles
     process_workload_memory_profiles "/tmp" "${workload}" "/tmp/${workload}"
   done
-  echo "Finished processing Fleetbench workloads."
+  log "Finished processing Fleetbench workloads."
 }
 
 
 folly_workloads=()
 
 function run_folly() {
-  echo "Processing Folly workloads..."
+  log "Processing Folly workloads..."
   # ============Folly====================
   if [[ -n "${folly_workloads[@]}" ]]; then
-    echo "No Folly workloads defined."
+    log "No Folly workloads defined."
   fi
-  echo "Finished processing Folly workloads."
+  log "Finished processing Folly workloads."
 }
 
 
 
 
 function show_help() {
-  echo "Usage: $0 [OPTIONS]"
-  echo "Options:"
-  echo "  --all         Run all workload categories (spec, clang, fleetbench, folly)."
-  echo "  --build-spec  Build SPEC workloads."
-  echo "  --spec        Run SPEC workloads."
-  echo "  --clang       Run CLANG workloads."
-  echo "  --fleetbench  Run Fleetbench workloads."
-  echo "  --folly       Run Folly workloads."
-  echo "  --benchmarks <benchmark1,benchmark2,...>"
-  echo "                Run only the specified benchmarks (comma-separated). Only runs if --<category> is specified also."
-  echo "                Available benchmarks:"
+  log "Usage: $0 [OPTIONS]"
+  log "Options:"
+  log "  --all         Run all workload categories (spec, clang, fleetbench, folly)."
+  log "  --build-spec  Build SPEC workloads."
+  log "  --spec        Run SPEC workloads."
+  log "  --clang       Run CLANG workloads."
+  log "  --fleetbench  Run Fleetbench workloads."
+  log "  --folly       Run Folly workloads."
+  log "  --benchmarks <benchmark1,benchmark2,...>"
+  log "                Run only the specified benchmarks (comma-separated). Only runs if --<category> is specified also."
+  log "                Available benchmarks:"
   if [[ ${#spec_workloads[@]} -gt 0 ]]; then
-    echo "                  SPEC: ${spec_workloads[*]}"
+    log "                  SPEC: ${spec_workloads[*]}"
   fi
   if [[ ${#clang_workloads[@]} -gt 0 ]]; then
-    echo "                  CLANG: ${clang_workloads[*]}"
+    log "                  CLANG: ${clang_workloads[*]}"
   fi
   if [[ ${#fleetbench_workloads[@]} -gt 0 ]]; then
-    echo "                  Fleetbench: ${fleetbench_workloads[*]}"
+    log "                  Fleetbench: ${fleetbench_workloads[*]}"
   fi
   if [[ ${#folly_workloads[@]} -gt 0 ]]; then
-    echo "                  Folly: ${folly_workloads[*]}"
+    log "                  Folly: ${folly_workloads[*]}"
   fi
-  echo "  --help, -h    Show this help message."
+  log "  --help, -h    Show this help message."
   exit 1
 }
 
@@ -245,7 +267,7 @@ function show_help() {
 
 
 #======MAIN====================================================================: 
-[[ -n "${TOP_DIR:-}" ]] || { echo "ERROR: TOP_DIR empty. Are you sure you sourced the environment? (source env.sh)" >&2; exit 1; }
+[[ -n "${TOP_DIR:-}" ]] || { log "ERROR: TOP_DIR empty. Are you sure you sourced the environment? (source env.sh)" >&2; exit 1; }
 
 current_datetime=$(date "+%Y-%m-%d_%H-%M-%S")
 curr_experiment="${current_datetime}"
@@ -255,7 +277,7 @@ OUT="${TOP_DIR}/out/$curr_experiment"
 base_command="bazel run //src:field_access_tool -- --stats --local --memprof_profiled_binary"
  
 mkdir -p "$OUT"
-echo "$OUT"
+log "$OUT"
 
 # Process command-line arguments
 run_all=false
@@ -296,7 +318,7 @@ while [[ $# -gt 0 ]]; do
         benchmark_provided=true
         shift # Consume the value
       else
-        echo "Error: No benchmarks specified for --benchmark option '$2'"
+        log "Error: No benchmarks specified for --benchmark option '$2'"
         show_help
       fi
       shift # Consume the option
@@ -305,7 +327,7 @@ while [[ $# -gt 0 ]]; do
       show_help
       ;;
     *)
-      echo "Error: Unknown option '$1'"
+      log "Error: Unknown option '$1'"
       show_help
       ;;
   esac
@@ -313,39 +335,40 @@ while [[ $# -gt 0 ]]; do
 done
 
 if $benchmark_provided; then
-  echo "Selecting benchmarks: ${selected_benchmarks[@]}"
+  log "Selecting benchmarks: ${selected_benchmarks[@]}"
   else
-  echo "No benchmarks selected. Using all available benchmarks."
+  log "No benchmarks selected. Using all available benchmarks."
   selected_benchmarks=("${available_benchmarks[@]}")
 fi
 
-echo "Selected benchmarks: ${selected_benchmarks[@]}"
+log "Selected benchmarks: ${selected_benchmarks[@]}"
 
-if $run_all; then
-  echo "Running all workload categories."
+if [[ "$run_all" == true ]]; then
+  log "Running all workload categories."
   run_spec "${selected_benchmarks[@]}"
   run_clang "${selected_benchmarks[@]}"
   run_fleetbench "${selected_benchmarks[@]}"
   run_folly
-elif $run_spec_flag; then
-  echo "Running SPEC workloads."
+elif [[ "$run_spec_flag" == true ]]; then
+  log "Running SPEC workloads."
   run_spec "${selected_benchmarks[@]}"
-elif $build_spec_flag; then
-  echo "Building SPEC and getting memprof."
+elif [[ "$build_spec_flag" == true ]]; then
+  log "Building SPEC and getting memprof."
   build_spec
-elif $run_clang_flag; then
-  echo "Running CLANG workloads."
+elif [[ "$run_clang_flag" == true ]]; then
+  log "Running CLANG workloads."
   run_clang "${selected_benchmarks[@]}"
-elif $run_fleetbench_flag; then
-  echo "Running Fleetbench workloads."
+elif [[ "$run_fleetbench_flag" == true ]]; then
+  log "Running Fleetbench workloads."
   run_fleetbench "${selected_benchmarks[@]}"
-elif $run_folly_flag; then
-  echo "Running Folly workloads."
+elif [[ "$run_folly_flag" == true ]]; then
+  log "Running Folly workloads."
   run_folly "${selected_benchmarks[@]}"
 else
-  echo "No workloads specified. Use --all or a specific category/benchmark."
+  log "No workloads specified. Use --all or a specific category/benchmark."
   show_help
 fi
+
 exit 0
 
 

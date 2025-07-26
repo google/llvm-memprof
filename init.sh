@@ -87,7 +87,8 @@ zlib1g-dev \
 libncurses5-dev \
 libtinfo-dev \
 pkg-config \
-selinux-utils
+selinux-utils \
+numactl # For Spec
 
 # Install bazel
 log "Adding Bazel GPG key and repository..."
@@ -115,13 +116,14 @@ mkdir -p build
 pushd build >/dev/null
 cmake -GNinja \
 -DLLVM_ENABLE_PROJECTS="clang;compiler-rt;lld" \
+-DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
 -DCMAKE_LINKER="lld" \
 -DCMAKE_INSTALL_PREFIX="$(pwd)/install" \
 -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_C_COMPILER=/usr/bin/clang \
 -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
--DCMAKE_C_FLAGS="-O2 -g" \
--DCMAKE_CXX_FLAGS="-O2 -g" \
+-DCMAKE_C_FLAGS="-O2" \
+-DCMAKE_CXX_FLAGS="-O2" \
 -DLLVM_ENABLE_LLD=On \
 -DLLVM_TARGETS_TO_BUILD=host \
 ../llvm
@@ -150,7 +152,8 @@ build --define LLVM_ROOT=${TOP_DIR}/third_party/llvm-project
 build --cxxopt="-std=c++20"
 EOF
 
-log "Wrote Bazel config to ${bazelrc}"
+log "Wrote Bazel config to ${bazelrc}:"
+cat ${TOP_DIR}/.bazelrc
 
 
 # Setting up python venv
@@ -164,5 +167,11 @@ log "Installing python requirements..."
 source "${TOP_DIR}/.venv/bin/activate"
 pip install --upgrade pip
 pip install -r requirements.txt
+
+
+# Generate unit tests
+log "Generating unit tests..."
+source env.sh
+bash "${TOP_DIR}/src/testdata/update_dwarf.sh"
 
 log "Initialization script complete."
