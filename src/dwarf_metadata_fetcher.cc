@@ -669,14 +669,24 @@ void DwarfMetadataFetcher::TypeData::VisitChildDIE(
       break;
     }
     std::string type_name = GetTypeQualifiedName(type_die);
-    uint64_t line_offset = die.getDeclLine();
+    uint64_t line_offset =  die.getDeclLine() - die.getParent().getDeclLine();
     uint64_t col_number =
         llvm::dwarf::toUnsigned(die.find(llvm::dwarf::DW_AT_decl_column), 0);
-    std::string func_name;
+    std::string func_name = "";
     if (die.find(llvm::dwarf::DW_AT_name)) {
       func_name = die.getShortName();
-    } else {
-      func_name = "";
+    }
+    if (func_name == "") {
+      const char *linkage_name = die.getParent().getLinkageName();
+      if (linkage_name != nullptr) {
+        func_name = linkage_name;
+      }
+    }
+    if (func_name == "") {
+      auto spec_die = die.getParent().getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_specification);
+      if(spec_die.isValid()) {
+        func_name = spec_die.getShortName();
+      }
     }
     heapalloc_sites.insert(
         {Frame(func_name, line_offset, col_number), type_name});
