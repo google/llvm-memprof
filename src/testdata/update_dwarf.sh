@@ -27,19 +27,6 @@ readonly MEMPROF_FLAGS=" -fuse-ld=lld -Wl,--no-rosegment \
 -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile \
 -mllvm -memprof-use-callbacks=true -mllvm -memprof-histogram"
 
-# readonly CC_FLAGS="\
-#   -std=c++20 \
-#   -stdlib=libc++ \
-#   -nostdinc++ \
-#   -g -gdwarf-5 \
-#   -fuse-ld=lld \
-#   -Wl,-build-id \
-#   -isystem ${TOP_DIR}/third_party/llvm-project/build/include \
-#   -I${TOP_DIR}/third_party/llvm-project/libcxx/include \
-#   -I${TOP_DIR}/third_party/llvm-project/libcxxabi/include \
-#   -L${TOP_DIR}/third_party/llvm-project/libcxxabi/lib \
-#   -L${TOP_DIR}/third_party/llvm-project/build/lib \
-#   -Wl,-rpath,${TOP_DIR}/third_party/llvm-project/libcxxabi/lib"
 readonly CC_FLAGS="\
   -std=c++20 \
   -stdlib=libstdc++ \
