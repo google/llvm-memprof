@@ -88,23 +88,19 @@ libncurses5-dev \
 libtinfo-dev \
 pkg-config \
 selinux-utils \
+unzip \
 numactl # For Spec
 
 # Install bazel
-log "Adding Bazel GPG key and repository..."
-curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel-archive-keyring.gpg
-sudo mv bazel-archive-keyring.gpg /usr/share/keyrings
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] \
-https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-| sudo tee /etc/apt/sources.list.d/bazel.list >/dev/n   ull
+log "Installing Bazel (6.4.0) for linux-x86 64..."
+curl -LO "https://github.com/bazelbuild/bazel/releases/download/6.4.0/bazel-6.4.0-linux-x86_64"
+chmod +x bazel-6.4.0-linux-x86_64
+sudo mv bazel-6.4.0-linux-x86_64 /usr/local/bin/bazel
 
-log "Updating apt (with Bazel repo)..."
-sudo apt update
-
-log "Installing Bazel (6.4.0)..."
-sudo apt install -y bazel-6.4.0
-sudo ln -sf /usr/bin/bazel-6.4.0 /usr/local/bin/bazel
-
+if ! command -v bazel &>/dev/null; then
+    echo "ERROR: Bazel not found. Please install Bazel before running this script."
+    exit 1
+fi
 log "Found bazel: $(bazel --version)"
 
 
