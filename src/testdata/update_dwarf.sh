@@ -90,6 +90,110 @@ function run_and_copy_memprof () {
   mv "${memprof_raw}" "${TESTDATA_PATH}/$1.memprofraw_test"
 }
 
+# Initial dwarfmetadata test data.
+function write_dwarfmetadata_testdata () {
+cat > ${TESTDATA_PATH}/dwarfmetadata_testdata.cc << EOF
+class Foo {
+ public:
+  class FooInsider {
+   public:
+    int a_;
+    int b_;
+    int c_;
+  };
+
+  Foo() {}
+  Foo(const Foo &other) {}
+  int a_;
+  char bad_pad_;
+  int *b_;
+  char b_arr_[32];
+  int **c_;
+};
+
+template <typename T>
+class Bar {
+ public:
+  class BarPublicInsider {
+   public:
+    int a_;
+    T t_;
+  };
+  T GetT() { return b_ + bpi_.t_ + bpi2_.t_; }
+  Foo c_;
+  Bar *d_;
+  Foo *e_;
+  Foo::FooInsider i_;
+  BarPublicInsider bpi_;
+
+ private:
+  class BarPrivateInsider {
+   public:
+    int a_;
+    T t_;
+    T **t_p_p_;
+  };
+  int a_;
+  T b_;
+  BarPrivateInsider bpi2_;
+};
+
+namespace AAA {
+namespace BBB {
+
+class CCC {
+ public:
+  CCC(double a, int b) {
+    ccc1 = b;
+    ccc2 = a;
+    fff.bad_pad_ = 'c';
+  }
+  CCC(int a) : ccc1(a) {}
+  CCC(){};
+  Foo fff;
+  int ccc1;
+  double ccc2;
+};
+
+class Foo {
+ public:
+  Foo() {}
+  int a;
+  int b;
+};
+
+class ChildFoo : Foo {
+ public:
+  ChildFoo() {}
+  int c;
+  int b;
+};
+
+}  // namespace BBB
+}  // namespace AAA
+
+typedef Foo FooFoo;
+typedef int int32_t;
+typedef int32_t myint32_t;
+typedef AAA::BBB::CCC MyCCC;
+
+int main() {
+  Bar<char> bar1;
+  Bar<int> bar2;
+  Bar<Foo> bar3;
+  Bar<Foo> bar4 = bar3;
+  Bar<AAA::BBB::CCC> bar5;
+  Bar<MyCCC> bar6;
+  FooFoo foofoo;
+  myint32_t i = 0;
+  AAA::BBB::CCC ccc(1.0, 2);
+  AAA::BBB::ChildFoo cf;
+  MyCCC ccc2(1);
+  return i;
+}
+EOF
+}
+
 # Basic type test with simple class.
 function write_basic_type () {
 cat > ${TESTDATA_PATH}/basic_type.cc << EOF
@@ -122,6 +226,99 @@ public:
 
 int main(int argc, char **argv) {
   B* b = new B;
+  return 0;
+}
+EOF
+}
+# Enum type checks that we can recursively resolve types.
+function write_enum_type_test () {
+cat > ${TESTDATA_PATH}/enum_type.cc << EOF
+enum E { X = 1, Y = 2, Z = 3 };
+
+class A {
+public:
+  E e;
+  double x;
+};
+
+int main() {
+  A *a = new A;
+  return 0;
+}
+EOF
+}
+
+# Clashing names in different namespaces test.
+function write_namespace_clash_test () {
+cat > ${TESTDATA_PATH}/namespace_clash.cc << EOF
+namespace name1 {
+class A {
+ public:
+  long x;
+  long y;
+};
+}  // namespace name1
+
+namespace name2 {
+class A {
+ public:
+  double x;
+  double y;
+};
+}  // namespace name2
+
+int main() {
+  name1::A *a1 = new name1::A;
+  name2::A *a2 = new name2::A;
+  return 0;
+}
+EOF
+}
+
+# Field with type from different namespace test.
+function write_namespace_field_test () {
+cat > ${TESTDATA_PATH}/namespace_field.cc << EOF
+#include <string>
+
+namespace n1 {
+struct B {
+  long x;
+  B() : x(1) {}
+};
+}
+
+struct A {
+  long x;
+  std::string y;
+  n1::B b;
+  A() : x(1), y(""), b() {}
+};
+
+int main() {
+  A* a = new A;
+  n1::B* bobj = new n1::B;
+  return 0;
+}
+EOF
+}
+
+# Typedef into another namespace test.
+function write_namespace_typedef_test () {
+cat > ${TESTDATA_PATH}/namespace_typedef.cc << EOF
+namespace n1 {
+struct A {
+  double x;
+  double y;
+};
+}
+
+namespace n2 {
+typedef n1::A B;
+}
+
+int main() {
+  n1::A* a = new n1::A;
+  n2::B* b = new n2::B;
   return 0;
 }
 EOF
@@ -434,10 +631,20 @@ EOF
 
 
 main() {
+  write_dwarfmetadata_testdata
+  compile_and_cp "dwarfmetadata_testdata"
   write_basic_type
   compile_and_cp "basic_type"
   write_embedded_type_test
   compile_and_cp "embedded_type"
+  write_enum_type_test
+  compile_and_cp "enum_type"
+  write_namespace_clash_test
+  compile_and_cp "namespace_clash"
+  write_namespace_field_test
+  compile_and_cp "namespace_field"
+  write_namespace_typedef_test
+  compile_and_cp "namespace_typedef"
   write_padding_type_test
   compile_and_cp "padding_type"
   write_map_type
@@ -467,6 +674,8 @@ main() {
 
   compile_proto "proto_simple"
   compile_proto "proto_complex"
+
+
 
   # Fix supported containers generation
   # compile_local "supported_stl_containers"

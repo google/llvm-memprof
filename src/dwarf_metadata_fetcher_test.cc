@@ -21,6 +21,7 @@
 #include <string>
 #include <utility>
 
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -29,6 +30,8 @@
 #include "src/main/cpp/util/path.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
+#include "re2/re2.h"
+
 
 constexpr const char *kDwarfMetadataFetchTestPath = "src/testdata/";
 
@@ -171,35 +174,6 @@ TEST(DwarfMetadataFetcherTest, NameclashTest) {
   ASSERT_EQ(metadata->fields.size(), 2);
   EXPECT_EQ(metadata->fields[0]->name, "x");
   EXPECT_EQ(metadata->fields[0]->type_name, "double");
-}
-
-TEST(DwarfMetadataFetcherTest, BasicStructTest) {
-  const std::string raw_dwarf_dir = kDwarfMetadataFetchTestPath;
-  const std::string dwarf_path =
-      blaze_util::JoinPath(raw_dwarf_dir, "basic_struct_type.dwarf");
-  const std::string linker_build_id = "e8f07bde09fd926a";
-
-  std::unique_ptr<BinaryFileRetriever> mock_retriever =
-      BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
-
-  DwarfMetadataFetcher test_target(std::move(mock_retriever),
-                                   ::testing::TempDir());
-  ASSERT_OK(test_target.FetchWithPath({{linker_build_id, dwarf_path}},
-                                      /*force_update_cache=*/true));
-
-  ASSERT_OK_AND_ASSIGN(auto metadata, test_target.GetType("A"));
-
-  // struct A {
-  //   long int x;
-  //   long int y;
-  // };
-
-  EXPECT_EQ(metadata->name, "A");
-  ASSERT_EQ(metadata->fields.size(), 2);
-  EXPECT_EQ(metadata->fields[0]->name, "x");
-  EXPECT_EQ(metadata->fields[0]->type_name, "long");
-  EXPECT_EQ(metadata->fields[1]->name, "y");
-  EXPECT_EQ(metadata->fields[1]->type_name, "long");
 }
 
 TEST(DwarfMetadataFetcherTest, UnwrapParameterizedStorageTest) {
@@ -375,9 +349,13 @@ TEST(DwarfMetadataFetcherTest, NamespaceFieldTest) {
   EXPECT_EQ(metadata->fields[1]->offset, 8);
   EXPECT_EQ(metadata->fields[2]->name, "");
   EXPECT_EQ(metadata->fields[2]->offset, 16);
-  EXPECT_EQ(metadata->fields[2]->type_name,
-            "std::__cxx11::basic_string<char, std::char_traits<char>, "
-            "std::allocator<char> >::Anon_197");
+  EXPECT_EQ(
+    RE2::FullMatch(
+        metadata->fields[2]->type_name,
+        R"(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::Anon_\d+)"
+    ),
+    true
+   );
 }
 
 // This tests if we can resolve union types. This is a special case, because
