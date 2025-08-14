@@ -27,28 +27,36 @@ jobs:
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo apt-get clean
         df -h
-
     - name: Checkout (with submodules)
       uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Build and Unit Tests
+    - name: Environment Setup
       shell: bash
       run: |
         set -euo pipefail
         ./init.sh --prebuilt-llvm
         source env.sh
-        bash src/testdata/update_dwarf.sh
         bazel --version
+
+    - name: Generate Testdata
+      shell: bash
+      run: |
+        source env.sh
+        bash src/testdata/update_dwarf.sh
+        
     - name: DwarfMetadata Fetcher Test
       run: |
+        source env.sh
         bazel run --cxxopt="-std=c++20" --crosstool_top=//toolchain:clang_suite //src:dwarf_metadata_fetcher_test --verbose_failures --sandbox_debug
-  
+
     - name: Type Resolver Test
       run: |
+        source env.sh
         bazel run --cxxopt="-std=c++20" --crosstool_top=//toolchain:clang_suite //src:type_resolver_test --verbose_failures  --sandbox_debug
    
     # - name: Histogram Builder Test
     #   run: |
+          # source env.sh
     #     bazel run --cxxopt="-std=c++20" --crosstool_top=//toolchain:clang_suite //src:histogram_builder_test --verbose_failures  --sandbox_debug
