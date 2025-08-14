@@ -14,17 +14,21 @@ jobs:
     steps:
     - name: Check disk space
       run: |
-        df . -h
+        df -h
         sudo du -ahx / | sort -rh | head -n 40
       
     - name: Free disk space
       run: |
+        set -euxo pipefail
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /usr/share/swift
+        sudo rm -rf /usr/local/.ghcup
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
-        sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo apt-get clean
         df -h
+        sudo du -ahx / | sort -rh | head -n 40
     - name: Checkout (with submodules)
       uses: actions/checkout@v4
       with:
