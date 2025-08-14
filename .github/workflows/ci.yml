@@ -8,7 +8,7 @@ on:
 
 jobs:
  build:
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: true
     steps:
@@ -20,7 +20,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        ./init.sh
+        ./init.sh --prebuilt-llvm
         source env.sh
         bazel --version
     - name: DwarfMetadata Fetcher Test

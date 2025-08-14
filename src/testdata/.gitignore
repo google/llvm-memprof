@@ -1,5 +1,8 @@
 *.dwp
 *.dwarf
+*.exe
+*.memprofraw
+*.show.yaml
 dwarfmetadata_testdata.cc
 basic_type.cc
 embedded_type.cc

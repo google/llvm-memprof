@@ -37,27 +37,27 @@ def _impl(ctx):
     tool_paths = [
         tool_path(
             name = "gcc",
-            path = LLVM_ROOT + "/build/bin/clang",
+            path = LLVM_ROOT + "/install/bin/clang",
         ),
         tool_path(
             name = "clang",
-            path =  LLVM_ROOT + "/build/bin/clang",
+            path =  LLVM_ROOT + "/install/bin/clang",
         ),
         tool_path(
             name = "clang++",
-            path =  LLVM_ROOT + "/build/bin/clang++",
+            path =  LLVM_ROOT + "/install/bin/clang++",
         ),
         tool_path(
             name = "cpp",
-            path =  LLVM_ROOT + "/build/bin/clang++",
+            path =  LLVM_ROOT + "/install/bin/clang++",
         ),
         tool_path(
             name = "ar",
-            path =  LLVM_ROOT + "/build/bin/llvm-ar",
+            path =  LLVM_ROOT + "/install/bin/llvm-ar",
         ),
         tool_path(
             name = "ld",
-            path =  LLVM_ROOT + "/build/bin/lld",
+            path =  LLVM_ROOT + "/install/bin/lld",
         ),
         tool_path(
             name = "gcov",
@@ -99,7 +99,8 @@ def _impl(ctx):
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         cxx_builtin_include_directories = [
-            LLVM_ROOT + "/build/lib/",
+            LLVM_ROOT + "/install/llvm/include/",
+            LLVM_ROOT + "/install/lib/clang/21/include/",
             "/usr/include",
         ],
         features = features,
