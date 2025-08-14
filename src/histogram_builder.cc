@@ -397,7 +397,7 @@ LocalHistogramBuilder::Create(
   RETURN_IF_ERROR(dwarf_metadata_fetcher->FetchDWPWithPath(
       {{.build_id = build_id, .path = memprof_profiled_binary_dwarf}},
       /*force_update_cache=*/true));
-      
+
   auto type_resolver = std::make_unique<DwarfTypeResolver>(
       std::move(dwarf_metadata_fetcher), /*is_local=*/true);
 

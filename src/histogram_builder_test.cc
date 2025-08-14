@@ -26,8 +26,8 @@
 #include "dwarf_metadata_fetcher.h"
 #include "gtest/gtest.h"
 #include "llvm/include/llvm/ProfileData/MemProf.h"
-#include "src/object_layout.pb.h"
 #include "src/main/cpp/util/path.h"
+#include "src/object_layout.pb.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
 #include "type_tree.h"
@@ -207,6 +207,30 @@ TEST(HistogramBuilderTest, TypeTreeStoreTest) {
   EXPECT_EQ(type_tree_a->Name(), "A");
   EXPECT_EQ(type_tree_a->Root()->GetTypeName(), "A");
   EXPECT_EQ(type_tree_a->Root()->GetSizeBytes(), 8);
+}
+
+// Simple Heapalloc end to end test
+TEST(HistogramBuilderTest, HeapAllocTest) {
+  const std::string exe_path =
+      blaze_util::JoinPath(kHistogramBuilderTestPath, "heapalloc.exe");
+  const std::string profile_path =
+      blaze_util::JoinPath(kHistogramBuilderTestPath, "heapalloc.memprofraw");
+
+  ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<AbstractHistogramBuilder> histogram_builder,
+      LocalHistogramBuilder::Create(profile_path, exe_path, exe_path,
+                                    /*type_prefix_filter=*/{},
+                                    /*callstack_filter=*/{},
+                                    /*only_records=*/false,
+                                    /*verify_verbose=*/false,
+                                    /*dump_unresolved_callstacks=*/false));
+  ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<HistogramBuilderResults> histogram_builder_results,
+      histogram_builder->BuildHistogram());
+
+  const TypeTreeStore* type_tree_store =
+      histogram_builder_results->type_tree_store.get();
+  type_tree_store->Dump(std::cout, 10);
 }
 
 // This test checks that the histogram builder can correctly build a histogram

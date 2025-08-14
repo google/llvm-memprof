@@ -21,17 +21,15 @@
 #include <string>
 #include <utility>
 
-
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "binary_file_retriever.h"
 #include "gtest/gtest.h"
+#include "re2/re2.h"
 #include "src/main/cpp/util/path.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
-#include "re2/re2.h"
-
 
 constexpr const char *kDwarfMetadataFetchTestPath = "src/testdata/";
 
@@ -350,12 +348,10 @@ TEST(DwarfMetadataFetcherTest, NamespaceFieldTest) {
   EXPECT_EQ(metadata->fields[2]->name, "");
   EXPECT_EQ(metadata->fields[2]->offset, 16);
   EXPECT_EQ(
-    RE2::FullMatch(
-        metadata->fields[2]->type_name,
-        R"(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::Anon_\d+)"
-    ),
-    true
-   );
+      RE2::FullMatch(
+          metadata->fields[2]->type_name,
+          R"(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::Anon_\d+)"),
+      true);
 }
 
 // This tests if we can resolve union types. This is a special case, because

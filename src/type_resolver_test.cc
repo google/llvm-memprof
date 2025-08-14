@@ -26,9 +26,9 @@
 #include "binary_file_retriever.h"
 #include "gtest/gtest.h"
 #include "src/dwarf_metadata_fetcher.h"
+#include "src/main/cpp/util/path.h"
 #include "src/object_layout.pb.h"
 #include "src/type_tree.h"
-#include "src/main/cpp/util/path.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
 
@@ -1331,7 +1331,8 @@ TEST(TypeResolverTest, SimpleProtoTest) {
   EXPECT_EQ(type_tree->Root()->GetTypeName(), "testdata::Record");
   EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 32);
   ASSERT_EQ(type_tree->Root()->NumChildren(), 2);
-  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(), "google::protobuf::Message");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(),
+            "google::protobuf::Message");
   EXPECT_EQ(type_tree->Root()->GetChild(0)->GetSizeBytes(), 16);
   EXPECT_EQ(type_tree->Root()->GetChild(1)->GetTypeName().substr(0, 16),
             "testdata::Record");
@@ -1370,13 +1371,15 @@ TEST(TypeResolverTest, ComplexProtoTest) {
   EXPECT_EQ(type_tree->Root()->GetTypeName(), "testdata::SearchResponse");
   EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 72);
   ASSERT_EQ(type_tree->Root()->NumChildren(), 2);
-  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(), "google::protobuf::Message");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(),
+            "google::protobuf::Message");
   EXPECT_EQ(type_tree->Root()->GetChild(0)->GetSizeBytes(), 16);
   ASSERT_EQ(type_tree->Root()->GetChild(1)->NumChildren(), 1);
   ASSERT_EQ(type_tree->Root()->GetChild(1)->GetChild(0)->NumChildren(), 3);
   EXPECT_EQ(
       type_tree->Root()->GetChild(1)->GetChild(0)->GetChild(0)->GetTypeName(),
-      "google::protobuf::internal::MapField<testdata::SearchResponse_ResultsByPageEntry_"
+      "google::protobuf::internal::MapField<testdata::SearchResponse_"
+      "ResultsByPageEntry_"
       "DoNotUse, int, testdata::Result, "
       "(google::protobuf::internal::WireFormatLite::FieldType)5, "
       "(google::protobuf::internal::WireFormatLite::FieldType)11>");
