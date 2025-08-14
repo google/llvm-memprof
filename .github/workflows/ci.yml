@@ -39,6 +39,7 @@ jobs:
         set -euo pipefail
         ./init.sh --prebuilt-llvm
         source env.sh
+        bash src/testdata/update_dwarf.sh
         bazel --version
     - name: DwarfMetadata Fetcher Test
       run: |

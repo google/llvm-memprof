@@ -43,6 +43,8 @@ set -x
 
 which clang
 which clang++
+which llvm-dwarfdump
+which llvm-profdata
 which ld.lld
 
 function compile_and_cp () {
@@ -62,32 +64,29 @@ function compile_proto () {
   cp bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.dwp || true
 }
 
+function compile_bazel () {
+  eval "bazel build --config=memprof --copt=-fmemory-profile=${TESTDATA_PATH}\
+  //src/testdata:$1"
+  eval "mv -f bazel-bin/src/testdata/$1 ${TESTDATA_PATH}.exe"
+}
+
 function compile_local () {
   eval "clang++ -mllvm -memprof-use-callbacks=true \
   -fPIC -fuse-ld=lld -Wl,--no-rosegment -g -fdebug-info-for-profiling \
   -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls \
-  -m64 -Wl,-build-id -no-pie -fmemory-profile=${TESTDATA_PATH}\
-  ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.exe_test"
-}
-
-function compile_bazel () {
-  eval "bazel run --config=memprof --fission=no --strip=never \
-  -c dbg --fdo_instrument=/tmp \ --copt=-fuse-ld=lld\
-  --copt=-g --copt=-fdebug-info-for-profiling --copt=-O0 \
-  --copt=-mllvm --copt=-memprof-histogram --copt=-fdebug-info-for-profiling \
-  --copt=-mno-omit-leaf-frame-pointer --copt=-fno-omit-frame-pointer \
-  --copt=-fno-optimize-sibling-calls \
-  --copt=-m64 --copt=-Wl,--copt=-build-id --copt=-fPIC \
-  --copt=-no-pie --copt=-fmemory-profile=${TESTDATA_PATH}\
-  //src/testdata:$1"
-  eval "mv bazel-bin/src/testdata/$1 ${TESTDATA_PATH}.exe_test"
+  -m64 -Wl,-build-id -Wl,-no-pie -Wl,--build-id -fmemory-profile=${TESTDATA_PATH}\
+  ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.exe"
 }
 
 function run_and_copy_memprof () {
-  eval "${TESTDATA_PATH}/$1.exe_test"
+  eval "${TESTDATA_PATH}/$1.exe"
   memprof_raw=$(find $TESTDATA_PATH -name "memprof.profraw.*" -print -quit 2>/dev/null)
   eval "echo ${memprof_raw}"
-  mv "${memprof_raw}" "${TESTDATA_PATH}/$1.memprofraw_test"
+  eval "mv -f ${memprof_raw} ${TESTDATA_PATH}/$1.memprofraw"
+}
+
+function show_memprof () {
+  eval "llvm-profdata show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
 }
 
 # Initial dwarfmetadata test data.
@@ -629,6 +628,20 @@ int main(int argc, char **argv) {
 EOF
 }
 
+# Write heapalloc test.
+function write_heapalloc() {
+cat > ${TESTDATA_PATH}/heapalloc.cc << EOF
+struct A {
+  int x;
+  int y;
+};
+
+int main() {
+  A* a = new A{1, 2};
+  delete a;
+}
+EOF
+}
 
 main() {
   write_dwarfmetadata_testdata
@@ -672,8 +685,17 @@ main() {
   write_std_optional_type
   compile_and_cp "std_optional_type"
 
+  write_heapalloc
+  compile_local "heapalloc"
+  run_and_copy_memprof "heapalloc"
+  show_memprof "heapalloc"
+
+  compile_bazel "heapalloc"
+  run_and_copy_memprof "heapalloc"
+
   compile_proto "proto_simple"
   compile_proto "proto_complex"
+
 
 
 

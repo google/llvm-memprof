@@ -94,6 +94,60 @@ def _impl(ctx):
                 ),
             ],
         ),
+        feature(
+            name = "memprof",
+            enabled = False,
+            flag_sets = [
+                flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                        "cc-compile",
+                        "preprocess-assemble",
+                    ],
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-O0",
+                                "-g",
+                                "-fstandalone-debug",
+                                "-fdebug-info-for-profiling",
+                                "-mno-omit-leaf-frame-pointer",
+                                "-fno-omit-frame-pointer",
+                                "-fno-optimize-sibling-calls",
+                                "-m64",
+                                "-fmemory-profile=.",
+                                "-fprofile-generate=.",
+                                "-mllvm", "-memprof-histogram",
+                                "-fno-exceptions",
+                                "-fPIC",
+                                "-stdlib=libc++",
+                            ]
+                        ),
+                    ],
+                ),
+                flag_set(
+                    actions = all_link_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-fuse-ld=lld",
+                                "-rtlib=compiler-rt",
+                                "-unwindlib=libunwind",
+                                "-stdlib=libc++",
+                                "-Wl,--no-rosegment",
+                                "-Wl,-build-id",
+                                "-no-pie",
+                                "-L" + LLVM_ROOT + "/install/lib",
+                                "-Wl,-rpath," + LLVM_ROOT + "/install/lib",
+                                "-l:libclang_rt.memprof.a",
+                                "-lm",
+                            ]
+                        )
+                    ],
+                )
+            ],
+        )
     ]
 
     return cc_common.create_cc_toolchain_config_info(

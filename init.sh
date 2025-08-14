@@ -167,14 +167,53 @@ log "Writing Bazel configuration to .bazelrc"
 
 bazelrc="${TOP_DIR}/.bazelrc"
 cat > "${bazelrc}" <<EOF
-# Use our custom C/C++ toolchain suite by default
 build --crosstool_top=//toolchain:clang_suite
+
+# Use C++20 standard
+build --cxxopt="-std=c++20"
+
+build --config=opt
+test  --config=opt
+run   --config=opt
+
+# Common compiler flags.
+build --copt='-fno-exceptions'
+build --copt='-funsigned-char'
+build --copt='-fno-strict-aliasing'
+build --copt='-fno-omit-frame-pointer'
+
+# Compile for the native architecture. This can be overridden with
+# --config=haswell, --config=westmere or --copt=-march=xyz
+build --copt='-march=native'
+
+# Optimized build. Prefer this for benchmarking.
+build:opt --compilation_mode=opt
+build:opt --copt='-O2'
+build:opt --copt='-momit-leaf-frame-pointer'
+
+build:opt --features=thin_lto
+build:opt --linkopt=-fuse-ld=lld
+build:opt --linkopt=-Wl,-O2
+
+build:memprof --features=memprof
+test:memprof  --features=memprof
+run:memprof   --features=memprof
+
+build:memprof --features=memprof
+build:memprof --fission=no
+build:memprof -c dbg
+
+test:memprof  --features=memprof
+test:memprof  --fission=no
+test:memprof  -c dbg
+
+run:memprof   --features=memprof
+run:memprof   --fission=no
+run:memprof   -c dbg
 
 # Point LLVM_ROOT to our local llvm-project checkout
 build --define LLVM_ROOT=${TOP_DIR}/third_party/llvm-project
 
-# Use C++20 standard
-build --cxxopt="-std=c++20"
 EOF
 
 log "Wrote Bazel config to ${bazelrc}:"
