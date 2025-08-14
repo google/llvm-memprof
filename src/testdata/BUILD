@@ -28,8 +28,8 @@ cc_binary(
 )
 
 cc_binary(
-    name = "heap_alloc",
-    srcs = ["heap_alloc.cc"],
+    name = "heapalloc",
+    srcs = ["heapalloc.cc"],
 )
 
 cc_proto_library(
@@ -46,6 +46,10 @@ cc_binary(
     name = "supported_adt_containers",
     srcs = ["supported_adt_containers.cc"],
     deps = ["@llvm-project//llvm:Support"],
+)
+cc_binary(
+    name = "supported_stl_containers",
+    srcs = ["supported_stl_containers.cc"],
 )
 
 cc_binary(

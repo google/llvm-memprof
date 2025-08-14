@@ -18,6 +18,11 @@
 
 # Setup environment and path.
 
+set -euo pipefail
+set -a
+source "$(git rev-parse --show-toplevel)/env.sh"
+set +a
+
 readonly TESTDATA_PATH="${TOP_DIR}/src/testdata"
 
 readonly MEMPROF_FLAGS=" -fuse-ld=lld -Wl,--no-rosegment \
@@ -59,15 +64,23 @@ function compile_proto () {
         --copt=-g \
         --copt=-gdwarf-5 \
         --copt=-ggdb \
-        --strip=never"
+        --strip=never \
+        -s --subcommands=pretty_print"
   rm -rf ${TESTDATA_PATH}/$1.dwp || true
   cp bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.dwp || true
 }
 
+function clean_bazel () {
+  rm -rf bazel-bin/src/testdata/$1
+  rm -rf bazel-out/k8-dbg/bin/src/testdata/$1
+}
+
 function compile_bazel () {
-  eval "bazel build --config=memprof --copt=-fmemory-profile=${TESTDATA_PATH}\
-  //src/testdata:$1"
-  eval "mv -f bazel-bin/src/testdata/$1 ${TESTDATA_PATH}.exe"
+  eval "bazel build //src/testdata:$1 \
+  --config=memprof \
+  --copt=-O0 \
+  --linkopt=-Wl,-O0"
+  eval "mv -f bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
 }
 
 function compile_local () {
@@ -628,21 +641,6 @@ int main(int argc, char **argv) {
 EOF
 }
 
-# Write heapalloc test.
-function write_heapalloc() {
-cat > ${TESTDATA_PATH}/heapalloc.cc << EOF
-struct A {
-  int x;
-  int y;
-};
-
-int main() {
-  A* a = new A{1, 2};
-  delete a;
-}
-EOF
-}
-
 main() {
   write_dwarfmetadata_testdata
   compile_and_cp "dwarfmetadata_testdata"
@@ -685,13 +683,15 @@ main() {
   write_std_optional_type
   compile_and_cp "std_optional_type"
 
-  write_heapalloc
-  compile_local "heapalloc"
+  clean_bazel "heapalloc"
+  compile_bazel "heapalloc"
   run_and_copy_memprof "heapalloc"
   show_memprof "heapalloc"
 
-  compile_bazel "heapalloc"
-  run_and_copy_memprof "heapalloc"
+  clean_bazel "supported_stl_containers"
+  compile_bazel "supported_stl_containers"
+  run_and_copy_memprof "supported_stl_containers"
+  show_memprof "supported_stl_containers"
 
   compile_proto "proto_simple"
   compile_proto "proto_complex"
