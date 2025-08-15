@@ -19,12 +19,9 @@
 
 # Setup environment and path.
 
-set -euo pipefail
-set -a
-source "$(git rev-parse --show-toplevel)/env.sh"
-set +a
+TOP_DIR="$(git rev-parse --show-toplevel)"
+LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin"
 
-echo $TOP_DIR
 
 readonly TESTDATA_PATH="${TOP_DIR}/src/testdata"
 
@@ -49,11 +46,18 @@ readonly CC_FLAGS="\
 set -e
 set -x
 
-which "clang"
-which clang++
-which llvm-dwarfdump
-which llvm-profdata
-which ld.lld
+CC="${LLVM_BIN_DIR}/clang"
+CXX="${LLVM_BIN_DIR}/clang++"
+DD="${LLVM_BIN_DIR}/llvm-dwarfdump"
+PD="${LLVM_BIN_DIR}/llvm-profdata"
+LLD="${LLVM_BIN_DIR}/ld.lld"
+
+which "${CC}"
+which "${CXX}"
+which "${DD}"
+which "${PD}"
+which "${LLD}"
+
 
 function clean_testdata () {
   rm -rf ${TESTDATA_PATH}/*.dwarf || true
@@ -66,7 +70,7 @@ function clean_testdata () {
 }
 
 function compile_and_cp () {
-  eval "clang++ $CC_FLAGS ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.dwarf"
+  eval "${CXX} $CC_FLAGS ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.dwarf"
 }
 
 function compile_proto () {
@@ -93,7 +97,7 @@ function compile_bazel () {
 }
 
 function compile_local () {
-  eval "clang++ -O0 -mllvm -memprof-use-callbacks=true \
+  eval "${CXX} -O0 -mllvm -memprof-use-callbacks=true \
   -mllvm -memprof-histogram \
   -fPIC -fuse-ld=lld -Wl,--no-rosegment -g -fdebug-info-for-profiling \
   -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls \
@@ -109,7 +113,7 @@ function run_and_copy_memprof () {
 }
 
 function show_memprof () {
-  eval "llvm-profdata show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
+  eval "${PD} show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
   eval "rm -rf ${TESTDATA_PATH}/*.profraw || true"
   eval "bash ${TOP_DIR}/scripts/demangle_show.sh ${TESTDATA_PATH}/$1.show.yaml"
 }
