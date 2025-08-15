@@ -47,6 +47,7 @@ cc_binary(
     srcs = ["supported_adt_containers.cc"],
     deps = ["@llvm-project//llvm:Support"],
 )
+
 cc_binary(
     name = "supported_stl_containers",
     srcs = ["supported_stl_containers.cc"],
@@ -56,7 +57,8 @@ cc_binary(
     name = "supported_abseil_containers",
     srcs = ["supported_abseil_containers.cc"],
     deps = [
-        "@com_google_absl//absl/container",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/container:btree",

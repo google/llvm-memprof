@@ -59,6 +59,17 @@ const TypeTree* GetTypeTreeForContainer(const TypeTreeStore* type_tree_store,
   return nullptr;
 }
 
+const TypeTree* GetTypeTree(const TypeTreeStore* type_tree_store,
+                            absl::string_view type_name) {
+  for (const auto& [unused, type_tree] :
+       type_tree_store->callstack_to_type_tree_) {
+    if (type_tree->Root()->GetTypeName() == type_name) {
+      return type_tree.get();
+    }
+  }
+  return nullptr;
+}
+
 int GetNumTypeTreesForContainer(const TypeTreeStore* type_tree_store,
                                 absl::string_view container_type_name) {
   int num_type_trees = 0;
@@ -222,7 +233,7 @@ TEST(HistogramBuilderTest, HeapAllocTest) {
                                     /*type_prefix_filter=*/{},
                                     /*callstack_filter=*/{},
                                     /*only_records=*/false,
-                                    /*verify_verbose=*/false,
+                                    /*verify_verbose=*/true,
                                     /*dump_unresolved_callstacks=*/false));
   ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<HistogramBuilderResults> histogram_builder_results,
@@ -230,7 +241,9 @@ TEST(HistogramBuilderTest, HeapAllocTest) {
 
   const TypeTreeStore* type_tree_store =
       histogram_builder_results->type_tree_store.get();
-  type_tree_store->Dump(std::cout, 10);
+  const TypeTree* type_tree = GetTypeTree(type_tree_store, "A");
+  ASSERT_NE(type_tree, nullptr);
+  EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 8);
 }
 
 // This test checks that the histogram builder can correctly build a histogram
@@ -246,7 +259,7 @@ TEST(HistogramBuilderTest, SupportedContainersTest) {
       LocalHistogramBuilder::Create(
           profile_path, exe_path, exe_path, /*type_prefix_filter=*/{},
           /*callstack_filter=*/{}, /*only_records=*/false,
-          /*verify_verbose=*/true, /*dump_unresolved_callstacks=*/true));
+          /*verify_verbose=*/true, /*dump_unresolved_callstacks=*/false));
   ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<HistogramBuilderResults> histogram_builder_results,
       histogram_builder->BuildHistogram());
@@ -285,15 +298,15 @@ TEST(HistogramBuilderTest, SupportedContainersTest) {
       "std::_Rb_tree_node<std::pair<const A, A> >", "A"));
 
   EXPECT_TRUE(TypeTreeStoreHasTypeTreeForContainer(
-      type_tree_store, "std::__cxx11::_List_base", "std::_List_node<A>"));
+      type_tree_store, "std::_List_base", "std::_List_node<A>"));
   EXPECT_TRUE(TypeTreeStoreTypeTreeForContainerHasNodeWithTypeName(
-      type_tree_store, "std::__cxx11::_List_base", "std::_List_node<A>", "A"));
+      type_tree_store, "std::_List_base", "std::_List_node<A>", "A"));
   EXPECT_TRUE(TypeTreeStoreHasTypeTreeForContainer(
       type_tree_store, "std::_Fwd_list_base", "std::_Fwd_list_node<A>"));
   EXPECT_TRUE(TypeTreeStoreTypeTreeForContainerHasNodeWithTypeName(
       type_tree_store, "std::_Fwd_list_base", "std::_Fwd_list_node<A>", "A"));
   EXPECT_TRUE(TypeTreeStoreHasTypeTreeForContainer(
-      type_tree_store, "std::__cxx11::basic_string", "char"));
+      type_tree_store, "std::basic_string", "char"));
   EXPECT_TRUE(TypeTreeStoreHasTypeTreeForContainer(
       type_tree_store, "std::__detail::_Hashtable_alloc",
       "std::__detail::_Hash_node<std::pair<const A, A>, false>"));

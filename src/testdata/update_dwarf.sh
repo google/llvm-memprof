@@ -86,7 +86,9 @@ function compile_bazel () {
   eval "bazel build //src/testdata:$1 \
   --copt=-O0 \
   --config=memprof \
-  --linkopt=-Wl,-O0"
+  --linkopt=-Wl,-O0" \
+  --copt="-fmemory-profile=${TESTDATA_PATH}" \
+  --copt="-fprofile-generate=${TESTDATA_PATH}"
   eval "mv -f ${TOP_DIR}/bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
 }
 
@@ -109,6 +111,7 @@ function run_and_copy_memprof () {
 function show_memprof () {
   eval "llvm-profdata show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
   eval "rm -rf ${TESTDATA_PATH}/*.profraw || true"
+  eval "bash ${TOP_DIR}/scripts/demangle_show.sh ${TESTDATA_PATH}/$1.show.yaml"
 }
 
 # Initial dwarfmetadata test data.
@@ -705,6 +708,14 @@ main() {
   compile_bazel "supported_stl_containers"
   run_and_copy_memprof "supported_stl_containers"
   show_memprof "supported_stl_containers"
+
+  compile_bazel "supported_adt_containers"
+  run_and_copy_memprof "supported_adt_containers"
+  show_memprof "supported_adt_containers"
+
+  compile_bazel "supported_abseil_containers"
+  run_and_copy_memprof "supported_abseil_containers"
+  show_memprof "supported_abseil_containers"
 
   compile_proto "proto_simple"
   compile_proto "proto_complex"

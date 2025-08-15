@@ -49,63 +49,47 @@ namespace devtools_crosstool_fdo_field_access {
 
 constexpr absl::string_view kSTLContainerTypes[] = {
     "std::_Vector_base",
-    "std::__u::_Vector_base",
+    "std::_Vector_base",
     "std::_Deque_base",
-    "std::__u::_Deque_base",
+    "std::_Deque_base",
     "std::_Rb_tree",
-    "std::__u::_Rb_tree",
-    "std::__u::__tree",
+    "std::_Rb_tree",
+    "std::__tree",
     "std::__tree",
     "std::__detail::_Hashtable_alloc",
-    "std::__u::__detail::_Hashtable_alloc",
+    "std::__detail::_Hashtable_alloc",
     "std::_Fwd_list_base",
-    "std::__u::_Fwd_list_base",
-    "std::__cxx11::_List_base",
-    "std::__u::__cxx11::list",
+    "std::_Fwd_list_base",
+    "std::_List_base",
+    "std::list",
     "absl::FixedArray",
     "xalanc_1_10::XalanVector",
 };
 
 constexpr absl::string_view kSTLContainerLeafCheckTypes[] = {
     "std::vector",
-    "std::__u::vector",
     "std::deque",
-    "std::__u::deque",
     "std::set",
-    "std::__u::set",
     "std::forward_list",
-    "std::__u::forward_list",
-    "std::__cxx11::list",
-    "std::__u::__cxx11::list",
+    "std::list",
+    "std::list",
     "std::stack",
-    "std::__u::stack",
     "std::queue",
-    "std::__u::queue",
     "std::priority_queue",
-    "std::__u::priority_queue",
     "std::map",
-    "std::__u::map",
     "std::multimap",
-    "std::__u::multimap",
     "std::multiset",
-    "std::__u::multiset",
     "std::flat_multiset",
-    "std::__u::flat_multiset",
     "std::flat_multimap",
-    "std::__u::flat_multimap",
     "std::unordered_set",
-    "std::__u::unordered_set",
     "std::unordered_map",
-    "std::__u::unordered_map",
     "std::unordered_multiset",
-    "std::__u::unordered_multiset",
     "std::unordered_multimap",
-    "std::__u::unordered_multimap",
 };
 
 constexpr absl::string_view kSmartPointersTypes[] = {
-    "_ZSt11make_unique", "_ZSt11make_shared", "_ZNSt3__u15allocate_shared",
-    "_ZNSt3__u11make_unique"};
+    "_ZSt11make_unique", "_ZSt11make_shared", "_ZNS15allocate_shared",
+    "_ZNS11make_unique"};
 
 constexpr absl::string_view kADTContainerTypes[] = {
     "llvm::SmallVectorTemplateBase<", "llvm::PagedVector<",
@@ -115,8 +99,8 @@ constexpr absl::string_view kADTContainerTypes[] = {
 constexpr absl::string_view kADTDenseContainerTypes[] = {"llvm::DenseMapBase"};
 
 constexpr absl::string_view kCharContainerTypesLeafFrame[] = {
-    "std::__cxx11::basic_string", "std::basic_string",
-    "absl::cord_internal::", "std::__u::basic_string", "absl::Cord::"};
+    "std::basic_string", "std::basic_string",
+    "absl::cord_internal::", "std::basic_string", "absl::Cord::"};
 
 constexpr absl::string_view kABSLContainerSwissMapTypes[] = {
     "absl::container_internal::raw_hash_map<",
@@ -139,13 +123,12 @@ constexpr absl::string_view kABSLContainerBtreeTypes[] = {
 
 constexpr absl::string_view kSpecialAllocatingFunctions[] = {
     "std::get_temporary_buffer",
-    "std::__u::get_temporary_buffer",
+    "std::get_temporary_buffer",
     "__gnu_cxx::get_temporary_buffer",
 };
 
 constexpr absl::string_view kAllocatorWrappers[] = {
     "std::allocator",
-    "std::__u::allocator",
     "std::__new_allocator",
     "__gnu_cxx::new_allocator",
     "muppet::instant::PolymorphicAllocator",
@@ -166,15 +149,42 @@ static std::string stripTrailingColons(const std::string& str) {
   }
 }
 
-std::optional<const std::string> StartsWithAnyOf(
+
+static inline std::string MakeTypePrefixPattern(absl::string_view canonical) {
+  const size_t lt = canonical.find('<');
+  absl::string_view head = (lt == absl::string_view::npos) ? canonical : canonical.substr(0, lt);
+  const size_t first = head.find("::");
+  const size_t last  = head.rfind("::");
+  if (first == absl::string_view::npos) {
+    return std::string("^") + RE2::QuoteMeta(std::string(head)) + "(?:$|::|<)";
+  }
+  std::string ns_root(head.substr(0, first));
+  std::string leaf(head.substr(last + 2));
+  return std::string("^")
+       + RE2::QuoteMeta(ns_root)
+       + "::(?:[^:]+::)*"
+       + RE2::QuoteMeta(leaf)
+       + "(?:$|::|<)";
+}
+
+
+static inline bool TypeStartsWith(absl::string_view s, absl::string_view canonical) {
+  const std::string pattern = MakeTypePrefixPattern(canonical);
+  re2::RE2 re(pattern);
+  return re2::RE2::PartialMatch(s, re);
+}
+
+static std::optional<const std::string> StartsWithAnyOf(
     absl::string_view str, const absl::string_view keywords[], size_t N) {
   for (int i = 0; i < N; ++i) {
-    if (absl::StartsWith(str, keywords[i])) {
+    if (TypeStartsWith(str, keywords[i])) {
       return std::string(keywords[i]);
     }
   }
   return std::nullopt;
 }
+
+
 
 std::string BuildCallstackString(
     const DwarfTypeResolver::CallStack& callstack) {
@@ -677,7 +687,7 @@ DwarfTypeResolver::GetCallStackContainerResolutionStrategy(
               StartsWithAnyOf(formal_param, kAllocatorWrappers,
                               ARRAY_SIZE(kAllocatorWrappers))) {
         if (!has_seen_alloc &&
-            absl::StartsWith(formal_param, *allocator_type)) {
+            TypeStartsWith(formal_param, *allocator_type)) {
           std::string type_name = UnwrapAndCleanTypeName(formal_param);
 
           fallthrough_strategy.container_type =
@@ -788,8 +798,8 @@ DwarfTypeResolver::GetCallStackContainerResolutionStrategy(
       }
 
       for (const absl::string_view allocator_type : kAllocatorWrappers) {
-        if (absl::StartsWith(formal_param, allocator_type) ||
-            absl::StartsWith(formal_param, "absl::container_internal::")) {
+        if (TypeStartsWith(formal_param, allocator_type) ||
+            TypeStartsWith(formal_param, "absl::container_internal::")) {
           last_frame_has_allocator_formal_param = true;
           has_seen_alloc = true;
         }
@@ -869,7 +879,7 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
                                             frame.function_name));
         for (const absl::string_view formal_param : formal_params) {
           for (const absl::string_view allocator_type : kAllocatorWrappers) {
-            if (absl::StartsWith(formal_param, allocator_type)) {
+            if (TypeStartsWith(formal_param, allocator_type)) {
               std::string type_name = UnwrapAndCleanTypeName(formal_param);
               return CreateTreeFromDwarf(type_name, /*from_container=*/true,
                                          resolution_strategy.container_name);
@@ -996,7 +1006,7 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
       for (const absl::string_view formal_param :
            type_data->formal_parameters) {
         for (const absl::string_view allocator_type : kAllocatorWrappers) {
-          if (absl::StartsWith(formal_param, allocator_type)) {
+          if (TypeStartsWith(formal_param, allocator_type)) {
             std::string type_name = UnwrapAndCleanTypeName(formal_param);
             if (resolution_strategy.container_type ==
                 ContainerResolutionStrategy::kAbseilContainerSwissMapNodeHash) {
@@ -1067,9 +1077,9 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
           metadata_fetcher_->GetType(resolution_strategy.lookup_type));
       for (const absl::string_view formal_param :
            type_data->formal_parameters) {
-        if (absl::StartsWith(formal_param,
+        if (TypeStartsWith(formal_param,
                              "absl::container_internal::set_params<") ||
-            absl::StartsWith(formal_param,
+            TypeStartsWith(formal_param,
                              "absl::container_internal::map_params<")) {
           ASSIGN_OR_RETURN(type_data, metadata_fetcher_->GetType(formal_param));
 
@@ -1107,7 +1117,7 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
           for (const absl::string_view formal_param_set_params :
                type_data->formal_parameters) {
             for (const absl::string_view allocator_type : kAllocatorWrappers) {
-              if (absl::StartsWith(formal_param_set_params, allocator_type)) {
+              if (TypeStartsWith(formal_param_set_params, allocator_type)) {
                 std::string type_name =
                     UnwrapAndCleanTypeName(formal_param_set_params);
                 ASSIGN_OR_RETURN(

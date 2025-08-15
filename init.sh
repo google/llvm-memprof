@@ -172,10 +172,6 @@ build --crosstool_top=//toolchain:clang_suite
 # Use C++20 standard
 build --cxxopt="-std=c++20"
 
-build --config=opt
-test  --config=opt
-run   --config=opt
-
 # Common compiler flags.
 build --copt='-fno-exceptions'
 build --copt='-funsigned-char'
@@ -196,20 +192,8 @@ build:opt --linkopt=-fuse-ld=lld
 build:opt --linkopt=-Wl,-O2
 
 build:memprof --features=memprof
-test:memprof  --features=memprof
-run:memprof   --features=memprof
-
-build:memprof --features=memprof
 build:memprof --fission=no
 build:memprof -c dbg
-
-test:memprof  --features=memprof
-test:memprof  --fission=no
-test:memprof  -c dbg
-
-run:memprof   --features=memprof
-run:memprof   --fission=no
-run:memprof   -c dbg
 
 # Point LLVM_ROOT to our local llvm-project checkout
 build --define LLVM_ROOT=${TOP_DIR}/third_party/llvm-project
