@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
 
 # Regenerate dwarf binaries for type_resolver_test.
 
@@ -22,6 +23,8 @@ set -euo pipefail
 set -a
 source "$(git rev-parse --show-toplevel)/env.sh"
 set +a
+
+echo $TOP_DIR
 
 readonly TESTDATA_PATH="${TOP_DIR}/src/testdata"
 
@@ -46,11 +49,21 @@ readonly CC_FLAGS="\
 set -e
 set -x
 
-which clang
+which "clang"
 which clang++
 which llvm-dwarfdump
 which llvm-profdata
 which ld.lld
+
+function clean_testdata () {
+  rm -rf ${TESTDATA_PATH}/*.dwarf || true
+  rm -rf ${TESTDATA_PATH}/*.dwp || true
+  rm -rf ${TESTDATA_PATH}/*.exe || true
+  rm -rf ${TESTDATA_PATH}/*.memprofraw || true
+  rm -rf ${TESTDATA_PATH}/*.show.yaml || true
+  rm -rf ${TOP_DIR}/bazel-out/k8-dbg/bin/src/testdata/* || true
+  # bazel clean --expunge || true
+}
 
 function compile_and_cp () {
   eval "clang++ $CC_FLAGS ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.dwarf"
@@ -64,30 +77,25 @@ function compile_proto () {
         --copt=-g \
         --copt=-gdwarf-5 \
         --copt=-ggdb \
-        --strip=never \
-        -s --subcommands=pretty_print"
+        --strip=never"
   rm -rf ${TESTDATA_PATH}/$1.dwp || true
   cp bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.dwp || true
 }
 
-function clean_bazel () {
-  rm -rf bazel-bin/src/testdata/$1
-  rm -rf bazel-out/k8-dbg/bin/src/testdata/$1
-}
-
 function compile_bazel () {
   eval "bazel build //src/testdata:$1 \
-  --config=memprof \
   --copt=-O0 \
+  --config=memprof \
   --linkopt=-Wl,-O0"
-  eval "mv -f bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
+  eval "mv -f ${TOP_DIR}/bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
 }
 
 function compile_local () {
-  eval "clang++ -mllvm -memprof-use-callbacks=true \
+  eval "clang++ -O0 -mllvm -memprof-use-callbacks=true \
+  -mllvm -memprof-histogram \
   -fPIC -fuse-ld=lld -Wl,--no-rosegment -g -fdebug-info-for-profiling \
   -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls \
-  -m64 -Wl,-build-id -Wl,-no-pie -Wl,--build-id -fmemory-profile=${TESTDATA_PATH}\
+  -m64 -Wl,-build-id -Wl,-no-pie -Wl,--build-id -stdlib=libstdc++ -fmemory-profile=${TESTDATA_PATH}\
   ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.exe"
 }
 
@@ -100,6 +108,7 @@ function run_and_copy_memprof () {
 
 function show_memprof () {
   eval "llvm-profdata show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
+  eval "rm -rf ${TESTDATA_PATH}/*.profraw || true"
 }
 
 # Initial dwarfmetadata test data.
@@ -642,6 +651,7 @@ EOF
 }
 
 main() {
+  clean_testdata
   write_dwarfmetadata_testdata
   compile_and_cp "dwarfmetadata_testdata"
   write_basic_type
@@ -683,12 +693,15 @@ main() {
   write_std_optional_type
   compile_and_cp "std_optional_type"
 
-  clean_bazel "heapalloc"
-  compile_bazel "heapalloc"
+  compile_local "heapalloc"
   run_and_copy_memprof "heapalloc"
   show_memprof "heapalloc"
 
-  clean_bazel "supported_stl_containers"
+  # For some reason the callstack does not properly show up here if I use new?
+  # compile_bazel "heapalloc"
+  # run_and_copy_memprof "heapalloc"
+  # show_memprof "heapalloc"
+
   compile_bazel "supported_stl_containers"
   run_and_copy_memprof "supported_stl_containers"
   show_memprof "supported_stl_containers"

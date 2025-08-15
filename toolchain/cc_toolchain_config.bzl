@@ -120,7 +120,6 @@ def _impl(ctx):
                                 "-mllvm", "-memprof-histogram",
                                 "-fno-exceptions",
                                 "-fPIC",
-                                "-stdlib=libstdc++",
                             ]
                         ),
                     ],
