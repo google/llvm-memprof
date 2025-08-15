@@ -45,7 +45,7 @@ jobs:
       run: |
         set -euo pipefail
         source env.sh
-        bash src/testdata/generate_testdata.sh
+        bash src/testdata/update_dwarf.sh
 
     - name: DwarfMetadata Fetcher Test
       run: |
