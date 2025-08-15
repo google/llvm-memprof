@@ -32,8 +32,6 @@ export NM="${LLVM_BIN_DIR}/llvm-nm"
 export RANLIB="${LLVM_BIN_DIR}/llvm-ranlib"
 export STRIP="${LLVM_BIN_DIR}/llvm-strip"
 
-whereis clang
-
 # Python venv
 if [ -f "${TOP_DIR}/.venv/bin/activate" ]; then
   source "${TOP_DIR}/.venv/bin/activate"

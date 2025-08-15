@@ -17,7 +17,17 @@ struct A {
   int y;
 };
 
+void foo(){
+  A* a = new A{1, 2};
+  a->x = 10;
+  delete a;
+  return;
+}
+
 int main() {
   A* a = new A{1, 2};
-  delete a;
+  a->x = 10;
+  a->x = 10;
+  foo();
+  return 0;
 }

@@ -232,4 +232,8 @@ source "${TOP_DIR}/.venv/bin/activate"
 pip install --upgrade pip
 pip install -r requirements.txt
 
+# Generate unit test data
+log "Generating unit tests..."
+bash "${TOP_DIR}/src/testdata/update_dwarf.sh"
+
 log "Initialization script complete."

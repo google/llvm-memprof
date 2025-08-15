@@ -108,7 +108,6 @@ def _impl(ctx):
                     flag_groups = [
                         flag_group(
                             flags = [
-                                "-O0",
                                 "-g",
                                 "-fstandalone-debug",
                                 "-fdebug-info-for-profiling",
@@ -121,7 +120,7 @@ def _impl(ctx):
                                 "-mllvm", "-memprof-histogram",
                                 "-fno-exceptions",
                                 "-fPIC",
-                                "-stdlib=libc++",
+                                "-stdlib=libstdc++",
                             ]
                         ),
                     ],
@@ -132,16 +131,13 @@ def _impl(ctx):
                         flag_group(
                             flags = [
                                 "-fuse-ld=lld",
-                                "-rtlib=compiler-rt",
-                                "-unwindlib=libunwind",
-                                "-stdlib=libc++",
+                                "-fPIC",
                                 "-Wl,--no-rosegment",
+                                "-mno-omit-leaf-frame-pointer",
                                 "-Wl,-build-id",
                                 "-no-pie",
-                                "-L" + LLVM_ROOT + "/install/lib",
-                                "-Wl,-rpath," + LLVM_ROOT + "/install/lib",
-                                "-l:libclang_rt.memprof.a",
-                                "-lm",
+                                "-fmemory-profile=.",
+                                "-fprofile-generate=."
                             ]
                         )
                     ],
@@ -155,6 +151,7 @@ def _impl(ctx):
         cxx_builtin_include_directories = [
             LLVM_ROOT + "/install/llvm/include/",
             LLVM_ROOT + "/install/lib/clang/21/include/",
+            LLVM_ROOT + "/install/include/c++/v1",
             "/usr/include",
         ],
         features = features,
