@@ -32,6 +32,15 @@ export NM="${LLVM_BIN_DIR}/llvm-nm"
 export RANLIB="${LLVM_BIN_DIR}/llvm-ranlib"
 export STRIP="${LLVM_BIN_DIR}/llvm-strip"
 
+alias clang="${CC}"
+alias clang++="${CXX}"
+alias lld="${LD}"
+alias llvm-ar="${AR}"
+alias llvm-nm="${NM}"
+alias llvm-ranlib="${RANLIB}"
+alias llvm-profdata="${LLVM_BIN_DIR}/llvm-profdata"
+alias llvm-dwarfdump="${LLVM_BIN_DIR}/llvm-dwarfdump"
+
 # Python venv
 if [ -f "${TOP_DIR}/.venv/bin/activate" ]; then
   source "${TOP_DIR}/.venv/bin/activate"
