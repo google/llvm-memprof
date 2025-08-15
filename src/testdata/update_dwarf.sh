@@ -20,7 +20,7 @@
 # Setup environment and path.
 
 TOP_DIR="$(git rev-parse --show-toplevel)"
-LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin"
+LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/install/bin"
 
 
 readonly TESTDATA_PATH="${TOP_DIR}/src/testdata"

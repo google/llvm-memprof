@@ -18,7 +18,7 @@ export TOP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 # Subdirs
 export SCRIPTS_DIR="${TOP_DIR}/scripts"
 export FLAMEGRAPH_DIR="${TOP_DIR}/third_party/FlameGraph"
-export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/build/bin"
+export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/install/bin"
 
 #Change open file limit.
 ulimit -n 65535
