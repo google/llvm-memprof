@@ -40,6 +40,13 @@ jobs:
         source env.sh
         bazel --version
 
+    - name: Generate Testdata
+      shell: bash
+      run: |
+        set -euo pipefail
+        source env.sh
+        bash src/testdata/generate_testdata.sh
+
     - name: DwarfMetadata Fetcher Test
       run: |
         bazel run --cxxopt="-std=c++20" --crosstool_top=//toolchain:clang_suite //src:dwarf_metadata_fetcher_test --verbose_failures --sandbox_debug
