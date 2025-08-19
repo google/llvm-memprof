@@ -74,7 +74,6 @@ function clean_testdata () {
   rm -rf ${TESTDATA_PATH}/*.profraw.* || true
   rm -rf ${TESTDATA_PATH}/*.show.yaml || true
   rm -rf ${TOP_DIR}/bazel-out/k8-dbg/bin/src/testdata/* || true
-  # bazel clean --expunge || true
 }
 
 function compile_and_cp () {
@@ -118,6 +117,7 @@ function run_and_copy_memprof () {
   memprof_raw=$(find $TESTDATA_PATH -name "memprof.profraw.*" -print -quit 2>/dev/null)
   eval "echo ${memprof_raw}"
   eval "mv -f ${memprof_raw} ${TESTDATA_PATH}/$1.memprofraw"
+  cat ${TESTDATA_PATH}/$1.memprofraw
 }
 
 function show_memprof () {
