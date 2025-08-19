@@ -64,6 +64,7 @@ function clean_testdata () {
   rm -rf ${TESTDATA_PATH}/*.dwp || true
   rm -rf ${TESTDATA_PATH}/*.exe || true
   rm -rf ${TESTDATA_PATH}/*.memprofraw || true
+  rm -rf ${TESTDATA_PATH}/*.profraw.* || true
   rm -rf ${TESTDATA_PATH}/*.show.yaml || true
   rm -rf ${TOP_DIR}/bazel-out/k8-dbg/bin/src/testdata/* || true
   # bazel clean --expunge || true
@@ -92,7 +93,8 @@ function compile_bazel () {
   --config=memprof \
   --linkopt=-Wl,-O0" \
   --copt="-fmemory-profile=${TESTDATA_PATH}" \
-  --copt="-fprofile-generate=${TESTDATA_PATH}"
+  --copt="-fprofile-generate=${TESTDATA_PATH}" \
+  --subcommands
   eval "mv -f ${TOP_DIR}/bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
 }
 
@@ -700,14 +702,9 @@ main() {
   write_std_optional_type
   compile_and_cp "std_optional_type"
 
-  compile_local "heapalloc"
+  compile_bazel "heapalloc"
   run_and_copy_memprof "heapalloc"
   show_memprof "heapalloc"
-
-  # For some reason the callstack does not properly show up here if I use new?
-  # compile_bazel "heapalloc"
-  # run_and_copy_memprof "heapalloc"
-  # show_memprof "heapalloc"
 
   compile_bazel "supported_stl_containers"
   run_and_copy_memprof "supported_stl_containers"
@@ -723,15 +720,6 @@ main() {
 
   compile_proto "proto_simple"
   compile_proto "proto_complex"
-
-
-
-
-  # Fix supported containers generation
-  # compile_local "supported_stl_containers"
-  # run_and_copy_memprof "supported_stl_containers"
-  # compile_bazel "supported_adt_containers"
-  # compile_bazel "supported_abseil_containers"
 }
 
 main

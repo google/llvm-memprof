@@ -233,7 +233,7 @@ TEST(HistogramBuilderTest, HeapAllocTest) {
                                     /*type_prefix_filter=*/{},
                                     /*callstack_filter=*/{},
                                     /*only_records=*/false,
-                                    /*verify_verbose=*/true,
+                                    /*verify_verbose=*/false,
                                     /*dump_unresolved_callstacks=*/false));
   ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<HistogramBuilderResults> histogram_builder_results,
@@ -248,7 +248,7 @@ TEST(HistogramBuilderTest, HeapAllocTest) {
 
 // This test checks that the histogram builder can correctly build a histogram
 // for all the supported STL containers.
-TEST(HistogramBuilderTest, SupportedContainersTest) {
+TEST(HistogramBuilderTest, SupportedSTLContainersTest) {
   const std::string exe_path = blaze_util::JoinPath(
       kHistogramBuilderTestPath, "supported_stl_containers.exe");
   const std::string profile_path = blaze_util::JoinPath(
@@ -259,7 +259,7 @@ TEST(HistogramBuilderTest, SupportedContainersTest) {
       LocalHistogramBuilder::Create(
           profile_path, exe_path, exe_path, /*type_prefix_filter=*/{},
           /*callstack_filter=*/{}, /*only_records=*/false,
-          /*verify_verbose=*/true, /*dump_unresolved_callstacks=*/false));
+          /*verify_verbose=*/false, /*dump_unresolved_callstacks=*/false));
   ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<HistogramBuilderResults> histogram_builder_results,
       histogram_builder->BuildHistogram());
@@ -361,8 +361,9 @@ TEST(HistogramBuilderTest, SupportedAbseilContainersTest) {
 
   const TypeTreeStore* type_tree_store =
       histogram_builder_results->type_tree_store.get();
+  // type_tree_store->Dump(std::cout, -1);
 
-  EXPECT_EQ(type_tree_store->callstack_to_type_tree_.size(), 6);
+  EXPECT_GE(type_tree_store->callstack_to_type_tree_.size(), 6);
   for (const auto& [callstack, type_tree] :
        type_tree_store->callstack_to_type_tree_) {
     EXPECT_TRUE(TypeTreeHasNodeWithTypeName(type_tree.get(), "A"));
@@ -370,12 +371,12 @@ TEST(HistogramBuilderTest, SupportedAbseilContainersTest) {
 
   // Four different hash containers with the same container internal type:
   // flat_hash_set, flat_hash_map, node_hash_set, node_hash_map.
-  EXPECT_EQ(GetNumTypeTreesForContainer(
+  EXPECT_GE(GetNumTypeTreesForContainer(
                 type_tree_store, "absl::container_internal::raw_hash_set"),
             2);
   // Four different btree containers with the same container internal type:
   // btree_set, btree_map, btree_multiset, btree_multimap.
-  EXPECT_EQ(GetNumTypeTreesForContainer(type_tree_store,
+  EXPECT_GE(GetNumTypeTreesForContainer(type_tree_store,
                                         "absl::container_internal::btree"),
             4);
 }

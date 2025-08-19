@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/PagedVector.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include <cstdint>
+
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/PagedVector.h"
+#include "llvm/ADT/SmallVector.h"
 
 struct A {
   std::uint64_t x;
@@ -30,23 +31,35 @@ struct DenseMapInfo<A> {
   static inline A getEmptyKey() { return A{~0ull, ~0ull}; }
   static inline A getTombstoneKey() { return A{~0ull - 1, ~0ull - 1}; }
   static unsigned getHashValue(const A &v) {
-    return static_cast<unsigned>((v.x ^ (v.y << 1)) ^ ((v.x >> 33) ^ (v.y >> 31)));
+    return static_cast<unsigned>((v.x ^ (v.y << 1)) ^
+                                 ((v.x >> 33) ^ (v.y >> 31)));
   }
-  static bool isEqual(const A &a, const A &b) { return a.x == b.x && a.y == b.y; }
+  static bool isEqual(const A &a, const A &b) {
+    return a.x == b.x && a.y == b.y;
+  }
 };
-}
+}  // namespace llvm
 
 int main() {
   llvm::SmallVector<A, 8> sv;
-  for (int i = 0; i < 20; ++i) sv.push_back({static_cast<std::uint64_t>(i+1), static_cast<std::uint64_t>(i+2)});
+  for (int i = 0; i < 20; ++i)
+    sv.push_back(
+        {static_cast<std::uint64_t>(i + 1), static_cast<std::uint64_t>(i + 2)});
 
   llvm::PagedVector<A> pv;
   pv.resize(20);
-  for (int i = 0; i < 20; ++i) pv[i] = {static_cast<std::uint64_t>(i+3), static_cast<std::uint64_t>(i+4)};
+  for (int i = 0; i < 20; ++i)
+    pv[i] = {static_cast<std::uint64_t>(i + 3),
+             static_cast<std::uint64_t>(i + 4)};
 
   llvm::DenseMap<A, unsigned> dm;
-  for (int i = 0; i < 20; ++i) dm.insert({{static_cast<std::uint64_t>(i+5), static_cast<std::uint64_t>(i+6)}, static_cast<unsigned>(i)});
+  for (int i = 0; i < 20; ++i)
+    dm.insert(
+        {{static_cast<std::uint64_t>(i + 5), static_cast<std::uint64_t>(i + 6)},
+         static_cast<unsigned>(i)});
 
   llvm::DenseSet<A> ds;
-  for (int i = 0; i < 20; ++i) ds.insert({static_cast<std::uint64_t>(i+7), static_cast<std::uint64_t>(i+8)});
+  for (int i = 0; i < 20; ++i)
+    ds.insert(
+        {static_cast<std::uint64_t>(i + 7), static_cast<std::uint64_t>(i + 8)});
 }

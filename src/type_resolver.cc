@@ -128,9 +128,7 @@ constexpr absl::string_view kSpecialAllocatingFunctions[] = {
 };
 
 constexpr absl::string_view kAllocatorWrappers[] = {
-    "std::allocator",
-    "std::__new_allocator",
-    "__gnu_cxx::new_allocator",
+    "std::allocator", "std::__new_allocator", "__gnu_cxx::new_allocator",
     "muppet::instant::PolymorphicAllocator",
     "xalanc_1_10::MemoryManagedConstructionTraits"};
 
@@ -149,42 +147,43 @@ static std::string stripTrailingColons(const std::string& str) {
   }
 }
 
-
-static inline std::string MakeTypePrefixPattern(absl::string_view canonical) {
+std::string DwarfTypeResolver::MakeTypePrefixPattern(
+    absl::string_view canonical) {
+  while (!canonical.empty() && canonical.back() == ':')
+    canonical.remove_suffix(1);
   const size_t lt = canonical.find('<');
-  absl::string_view head = (lt == absl::string_view::npos) ? canonical : canonical.substr(0, lt);
+  absl::string_view head =
+      (lt == absl::string_view::npos) ? canonical : canonical.substr(0, lt);
+
   const size_t first = head.find("::");
-  const size_t last  = head.rfind("::");
   if (first == absl::string_view::npos) {
-    return std::string("^") + RE2::QuoteMeta(std::string(head)) + "(?:$|::|<)";
+    return "^(" + re2::RE2::QuoteMeta(std::string(head)) + ")(?:$|::|<)";
   }
+
   std::string ns_root(head.substr(0, first));
-  std::string leaf(head.substr(last + 2));
-  return std::string("^")
-       + RE2::QuoteMeta(ns_root)
-       + "::(?:[^:]+::)*"
-       + RE2::QuoteMeta(leaf)
-       + "(?:$|::|<)";
+  std::string tail(head.substr(first + 2));
+  return "^(" + re2::RE2::QuoteMeta(ns_root) + "::(?:[^:]+::)?" +
+         re2::RE2::QuoteMeta(tail) + ")(?:$|::|<)";
 }
 
-
-static inline bool TypeStartsWith(absl::string_view s, absl::string_view canonical) {
-  const std::string pattern = MakeTypePrefixPattern(canonical);
-  re2::RE2 re(pattern);
-  return re2::RE2::PartialMatch(s, re);
+std::optional<std::string> DwarfTypeResolver::TypeStartsWith(
+    absl::string_view s, absl::string_view canonical) {
+  const std::string pat = MakeTypePrefixPattern(canonical);
+  re2::RE2 re(pat);
+  std::string m;
+  if (re2::RE2::PartialMatch(s, re, &m)) return m;
+  return std::nullopt;
 }
 
 static std::optional<const std::string> StartsWithAnyOf(
     absl::string_view str, const absl::string_view keywords[], size_t N) {
   for (int i = 0; i < N; ++i) {
-    if (TypeStartsWith(str, keywords[i])) {
+    if (DwarfTypeResolver::TypeStartsWith(str, keywords[i])) {
       return std::string(keywords[i]);
     }
   }
   return std::nullopt;
 }
-
-
 
 std::string BuildCallstackString(
     const DwarfTypeResolver::CallStack& callstack) {
@@ -687,7 +686,7 @@ DwarfTypeResolver::GetCallStackContainerResolutionStrategy(
               StartsWithAnyOf(formal_param, kAllocatorWrappers,
                               ARRAY_SIZE(kAllocatorWrappers))) {
         if (!has_seen_alloc &&
-            TypeStartsWith(formal_param, *allocator_type)) {
+            DwarfTypeResolver::TypeStartsWith(formal_param, *allocator_type)) {
           std::string type_name = UnwrapAndCleanTypeName(formal_param);
 
           fallthrough_strategy.container_type =
@@ -757,8 +756,7 @@ DwarfTypeResolver::GetCallStackContainerResolutionStrategy(
             hash_set_typedata_status = metadata_fetcher_->GetType(formal_param);
         if (!hash_set_typedata_status.ok()) {
           return ContainerResolutionStrategy(
-              container_type->substr(0, container_type->length() - 1),
-              callstack.at(0).function_name,
+              *container_type, callstack.at(0).function_name,
               ContainerResolutionStrategy::kAbslAllocatorAllocate,
               cleaned_formal_param);
         }
@@ -788,6 +786,7 @@ DwarfTypeResolver::GetCallStackContainerResolutionStrategy(
               cleaned_formal_param);
         }
       }
+
       if (const auto container_type =
               StartsWithAnyOf(formal_param, kABSLContainerBtreeTypes,
                               ARRAY_SIZE(kABSLContainerBtreeTypes))) {
@@ -798,8 +797,9 @@ DwarfTypeResolver::GetCallStackContainerResolutionStrategy(
       }
 
       for (const absl::string_view allocator_type : kAllocatorWrappers) {
-        if (TypeStartsWith(formal_param, allocator_type) ||
-            TypeStartsWith(formal_param, "absl::container_internal::")) {
+        if (DwarfTypeResolver::TypeStartsWith(formal_param, allocator_type) ||
+            DwarfTypeResolver::TypeStartsWith(formal_param,
+                                              "absl::container_internal::")) {
           last_frame_has_allocator_formal_param = true;
           has_seen_alloc = true;
         }
@@ -879,7 +879,8 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
                                             frame.function_name));
         for (const absl::string_view formal_param : formal_params) {
           for (const absl::string_view allocator_type : kAllocatorWrappers) {
-            if (TypeStartsWith(formal_param, allocator_type)) {
+            if (DwarfTypeResolver::TypeStartsWith(formal_param,
+                                                  allocator_type)) {
               std::string type_name = UnwrapAndCleanTypeName(formal_param);
               return CreateTreeFromDwarf(type_name, /*from_container=*/true,
                                          resolution_strategy.container_name);
@@ -951,43 +952,43 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
       //                                         callstack.at(0).function_name));
       int64_t Alignment = 8;
 
-      /* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
-      // absl::StatusOr<const DwarfMetadataFetcher::TypeData*>
-      // group_type_data_or =
-      //     metadata_fetcher_->GetType("absl::container_internal::Group");
-      // if (!group_type_data_or.ok()) {
-      //   std::cout << "Group not found\n";
-      //   return absl::NotFoundError(BuildErrorMessageInResolution(
-      //       formal_params, callstack, resolution_strategy,
-      //       "Group type not found."));
-      // } else {
-      //   std::cout << "Group found\n";
-      // }
-      // const DwarfMetadataFetcher::TypeData* group_type_data =
-      //     group_type_data_or.value();
-      // // ASSIGN_OR_RETURN(
-      // //     const DwarfMetadataFetcher::TypeData* group_type_data,
-      // //     metadata_fetcher_->GetType("absl::container_internal::Group"));
-      // std::cout << "After group_type_data\n";
+      const std::string absl_internal = *DwarfTypeResolver::TypeStartsWith(
+          resolution_strategy.lookup_type, "absl::container_internal");
 
-      // const auto it = group_type_data->constant_variables.find("kWidth");
-      // if (it == group_type_data->constant_variables.end()) {
-      //   std::cout << BuildErrorMessageInResolution(
-      //       formal_params, callstack, resolution_strategy,
-      //       "No constant variable kWidth found.");
-      //   return absl::NotFoundError(BuildErrorMessageInResolution(
-      //       formal_params, callstack, resolution_strategy,
-      //       "No constant variable kWidth found."));
-      // }
-      // int64_t kWidth = it->second;
       /* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
-      int64_t kWidth = 16;
+      std::cout << absl::StrCat(absl_internal, "Group") << std::endl;
+      absl::StatusOr<const DwarfMetadataFetcher::TypeData*> group_type_data_or =
+          metadata_fetcher_->GetType(absl::StrCat(absl_internal, "::Group"));
+      if (!group_type_data_or.ok()) {
+        std::cout << "Group not found\n";
+        return absl::NotFoundError(BuildErrorMessageInResolution(
+            formal_params, callstack, resolution_strategy,
+            "Group type not found."));
+      } else {
+        std::cout << "Group found\n";
+      }
+      const DwarfMetadataFetcher::TypeData* group_type_data =
+          group_type_data_or.value();
+
+      const auto it = group_type_data->constant_variables.find("kWidth");
+      if (it == group_type_data->constant_variables.end()) {
+        std::cout << BuildErrorMessageInResolution(
+            formal_params, callstack, resolution_strategy,
+            "No constant variable kWidth found.");
+        return absl::NotFoundError(BuildErrorMessageInResolution(
+            formal_params, callstack, resolution_strategy,
+            "No constant variable kWidth found."));
+      }
+      int64_t kWidth = it->second;
       /* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
-      // ASSIGN_OR_RETURN(const DwarfMetadataFetcher::TypeData* size_type_data,
-      //                  metadata_fetcher_->GetType("size_t"));
+      // int64_t kWidth = 16;
+      /* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
+      ASSIGN_OR_RETURN(const DwarfMetadataFetcher::TypeData* size_type_data,
+                       metadata_fetcher_->GetType("size_t"));
+      // int64_t size_t_size = 64;
+      //* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
       // int64_t size_t_size = size_type_data->size * 8;
-      /* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
-      int64_t size_t_size = 64;
+      int64_t size_t_size = size_type_data->size * 8;
 
       // For now we assume that hashtablez is not enabled. When an allocation is
       // chosen for sampling, and the BackingArray has a hashtablez_info_handle,
@@ -1006,7 +1007,7 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
       for (const absl::string_view formal_param :
            type_data->formal_parameters) {
         for (const absl::string_view allocator_type : kAllocatorWrappers) {
-          if (TypeStartsWith(formal_param, allocator_type)) {
+          if (DwarfTypeResolver::TypeStartsWith(formal_param, allocator_type)) {
             std::string type_name = UnwrapAndCleanTypeName(formal_param);
             if (resolution_strategy.container_type ==
                 ContainerResolutionStrategy::kAbseilContainerSwissMapNodeHash) {
@@ -1077,26 +1078,26 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
           metadata_fetcher_->GetType(resolution_strategy.lookup_type));
       for (const absl::string_view formal_param :
            type_data->formal_parameters) {
-        if (TypeStartsWith(formal_param,
-                             "absl::container_internal::set_params<") ||
-            TypeStartsWith(formal_param,
-                             "absl::container_internal::map_params<")) {
+        if (DwarfTypeResolver::TypeStartsWith(
+                formal_param, "absl::container_internal::set_params<") ||
+            DwarfTypeResolver::TypeStartsWith(
+                formal_param, "absl::container_internal::map_params<")) {
           ASSIGN_OR_RETURN(type_data, metadata_fetcher_->GetType(formal_param));
 
+          std::string wrapper = *DwarfTypeResolver::TypeStartsWith(
+              formal_param, "absl::container_internal");
           std::string constant_lookup_type =
-              WrapType("absl::container_internal::btree_node", formal_param);
+              WrapType(absl::StrCat(wrapper, "::btree_node"), formal_param);
 
           absl::StatusOr<const DwarfMetadataFetcher::TypeData*>
-              generation_typedata = metadata_fetcher_->GetType(
-                  "absl::container_internal::btree_iterator_generation_"
-                  "info_enabled");
+              generation_typedata = metadata_fetcher_->GetType(absl::StrCat(
+                  wrapper, "::btree_iterator_generation_info_enabled"));
 
           bool generation_enabled = generation_typedata.ok();
 
           ASSIGN_OR_RETURN(
               const DwarfMetadataFetcher::TypeData* constant_typedata,
               metadata_fetcher_->GetType(constant_lookup_type));
-
           auto it = constant_typedata->constant_variables.find("kNodeSlots");
           if (it == constant_typedata->constant_variables.end()) {
             return absl::NotFoundError(BuildErrorMessageInResolution(
@@ -1106,7 +1107,7 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
           int64_t kNodeSlots = it->second;
 
           std::string btree_field_type_name = absl::StrCat(
-              WrapType("absl::container_internal::btree", formal_param),
+              WrapType(absl::StrCat(wrapper, "::btree"), formal_param),
               "::field_type");
 
           ASSIGN_OR_RETURN(
@@ -1117,7 +1118,8 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
           for (const absl::string_view formal_param_set_params :
                type_data->formal_parameters) {
             for (const absl::string_view allocator_type : kAllocatorWrappers) {
-              if (TypeStartsWith(formal_param_set_params, allocator_type)) {
+              if (DwarfTypeResolver::TypeStartsWith(formal_param_set_params,
+                                                    allocator_type)) {
                 std::string type_name =
                     UnwrapAndCleanTypeName(formal_param_set_params);
                 ASSIGN_OR_RETURN(
@@ -1143,7 +1145,7 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
 
                     TypeTree::CreateTreeFromObjectLayout(
                         template_object_layout,
-                        WrapType("absl::container_internal::btree_node",
+                        WrapType(absl::StrCat(wrapper, "::btree_node"),
                                  slot_type_tree->Name()),
                         "absl::container_internal::btree");
                 RETURN_IF_ERROR(btree_node_type_tree->MergeTreeIntoThis(

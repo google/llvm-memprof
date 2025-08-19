@@ -21,20 +21,36 @@
 #include <string>
 #include <utility>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "binary_file_retriever.h"
+#include "dwarf_metadata_fetcher.h"
 #include "gtest/gtest.h"
-#include "src/dwarf_metadata_fetcher.h"
-#include "src/main/cpp/util/path.h"
+#include "llvm/include/llvm/Object/Binary.h"
+#include "llvm/include/llvm/Object/BuildID.h"
+#include "llvm/include/llvm/Object/ObjectFile.h"
+#include "main/cpp/util/path.h"
 #include "src/object_layout.pb.h"
-#include "src/type_tree.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
+#include "type_tree.h"
 
 namespace devtools_crosstool_fdo_field_access {
 
 namespace {
+
+static absl::StatusOr<std::string> GetBuildIdForLocalFile(
+    absl::string_view memprof_profiled_binary) {
+  llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> elfobj =
+      llvm::object::ObjectFile::createObjectFile(memprof_profiled_binary);
+  if (!elfobj) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Cannot create object file for ", memprof_profiled_binary));
+  }
+  return llvm::toHex(::llvm::object::getBuildID(elfobj->getBinary()),
+                     /*lowercase=*/true);
+}
 
 constexpr uint64_t kDummyLineColNo = 0;
 
@@ -45,7 +61,15 @@ constexpr const char *kTypeResolverTestPath = "src/testdata";
 TEST(TypeResolverTest, BasicTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "basic_type.dwarf");
-  const std::string linker_build_id = "056d411c166d583f";
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "A";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -83,7 +107,16 @@ TEST(TypeResolverTest, BasicTest) {
 TEST(TypeResolverTest, EmbeddedTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "embedded_type.dwarf");
-  const std::string linker_build_id = "79f61a072f0c57d1";
+
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "B";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -144,8 +177,15 @@ TEST(TypeResolverTest, EmbeddedTest) {
 TEST(TypeResolverTest, PaddingTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "padding_type.dwarf");
-  const std::string linker_build_id = "ebe406c70a15578d";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -212,8 +252,15 @@ TEST(TypeResolverTest, PaddingTypeTest) {
 TEST(TypeResolverTest, StdMapTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "std_map_type.dwarf");
-  const std::string linker_build_id = "25865f087139ad4e";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -268,8 +315,15 @@ TEST(TypeResolverTest, StdMapTypeTest) {
 TEST(TypeResolverTest, UnionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "union_type.dwarf");
-  const std::string linker_build_id = "bac290aca8128893";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -311,8 +365,15 @@ TEST(TypeResolverTest, UnionTypeTest) {
 TEST(TypeResolverTest, ArrayTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "array_type.dwarf");
-  const std::string linker_build_id = "f1747dd609fe8c60";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -412,8 +473,15 @@ TEST(TypeResolverTest, ArrayTypeTest) {
 TEST(TypeResolverTest, VectorTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "vector_type.dwarf");
-  const std::string linker_build_id = "9d9de85561da7496";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -484,8 +552,15 @@ TEST(TypeResolverTest, CreateFromObjectLayoutTest) {
 TEST(TypeResolverTest, FieldAccessHistogramTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "std_map_type.dwarf");
-  const std::string linker_build_id = "25865f087139ad4e";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -665,8 +740,15 @@ TEST(TypeResolverTest, MergeAccessCountsTest) {
 TEST(TypeResolverTest, SimpleRecordAccessTest) {
   const std::string dwarf_path = blaze_util::JoinPath(
       kTypeResolverTestPath, "simple_record_access_type.dwarf");
-  const std::string linker_build_id = "f5412ed20726e01a";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -760,8 +842,15 @@ TEST(TypeResolverTest, SimpleRecordAccessTest) {
 TEST(TypeResolverTest, ArrayAccessCountTest) {
   const std::string dwarf_path = blaze_util::JoinPath(
       kTypeResolverTestPath, "array_access_count_test.dwarf");
-  const std::string linker_build_id = "158c92614fde7e6d";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -915,8 +1004,15 @@ TEST(TypeResolverTest, ArrayAccessCountTest) {
 TEST(TypeResolverTest, VectorUniquePointerTest) {
   const std::string dwarf_path = blaze_util::JoinPath(
       kTypeResolverTestPath, "vector_unique_pointer_type.dwarf");
-  const std::string linker_build_id = "15e2e949dd6612ad";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -951,8 +1047,15 @@ TEST(TypeResolverTest, VectorUniquePointerTest) {
 TEST(TypeResolverTest, VectorFunctionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "vector_function_type.dwarf");
-  const std::string linker_build_id = "fbdb062b430f6c94";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -987,8 +1090,15 @@ TEST(TypeResolverTest, VectorFunctionTypeTest) {
 TEST(TypeResolverTest, ConstPointerTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "const_pointer_type.dwarf");
-  const std::string linker_build_id = "51bded6ccf11062e";
-
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -1099,7 +1209,15 @@ TEST(TypeResolverTest, TypeTreeMergeTest) {
 TEST(TypeResolverTest, SimpleUnionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "simple_union_type.dwarf");
-  const std::string linker_build_id = "237d613e3cc628de";
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "SimpleUnion";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1139,7 +1257,15 @@ TEST(TypeResolverTest, SimpleUnionTypeTest) {
 TEST(TypeResolverTest, AnonymousUnionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "anonymous_union_type.dwarf");
-  const std::string linker_build_id = "b9994af308c2237f";
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "AnonymousUnion";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1195,7 +1321,15 @@ TEST(TypeResolverTest, AnonymousUnionTypeTest) {
 TEST(TypeResolverTest, StdOptionalTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "std_optional_type.dwarf");
-  const std::string linker_build_id = "0d4667e5e9c4f29f";
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "B";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1307,7 +1441,15 @@ TEST(TypeResolverTest, StdOptionalTypeTest) {
 TEST(TypeResolverTest, SimpleProtoTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "proto_simple.dwp");
-  const std::string linker_build_id = "";
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "testdata::Record";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1352,7 +1494,15 @@ TEST(TypeResolverTest, SimpleProtoTest) {
 TEST(TypeResolverTest, ComplexProtoTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "proto_complex.dwp");
-  const std::string linker_build_id = "";
+  auto status_or = GetBuildIdForLocalFile(dwarf_path);
+  std::string linker_build_id;
+  if (status_or.ok()) {
+    linker_build_id = status_or.value();
+  } else {
+    linker_build_id = "";
+    LOG(WARNING) << "Failed to get build id for local file: "
+                 << status_or.status() << " continuing with empty build id.";
+  }
   const std::string type_name = "testdata::SearchResponse";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =

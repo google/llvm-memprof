@@ -38,19 +38,33 @@ H AbslHashValue(H h, const A& a) {
 int main() {
   absl::flat_hash_set<A> fhs;
   fhs.insert({1, 2});
+  fhs.insert({3, 4});
+  fhs.insert({5, 6});
 
   absl::flat_hash_map<A, unsigned> fhm;
   fhm.insert({{3, 4}, 42});
+  fhm.insert({{5, 6}, 43});
+  fhm.insert({{7, 8}, 44});
 
   absl::btree_set<A> bs;
   bs.insert({5, 6});
+  bs.insert({1, 2});
+  bs.insert({3, 4});
+  bs.insert({7, 8});
 
   absl::btree_map<A, unsigned> bm;
   bm.insert({{7, 8}, 7});
+  bm.insert({{5, 6}, 56});
+  bm.insert({{3, 4}, 34});
+  bm.insert({{1, 2}, 12});
 
   absl::btree_multiset<A> bms;
   bms.insert({9, 10});
+  bms.insert({11, 12});
+  bms.insert({7, 8});
 
   absl::btree_multimap<A, unsigned> bmm;
   bmm.insert({{11, 12}, 11});
+  bmm.insert({{13, 14}, 13});
+  bmm.insert({{5, 6}, 56});
 }
