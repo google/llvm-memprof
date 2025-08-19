@@ -32,16 +32,23 @@ readonly MEMPROF_FLAGS=" -fuse-ld=lld -Wl,--no-rosegment \
 -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile \
 -mllvm -memprof-use-callbacks=true -mllvm -memprof-histogram"
 
+# Make sure to build with C++20 and libc++ for consistency of tests.
 readonly CC_FLAGS="\
   -std=c++20 \
-  -stdlib=libstdc++ \
+  -stdlib=libc++ \
+  -nostdinc++ \
+  -nostdlib++ \
   -g -gdwarf-5 \
   -fuse-ld=lld \
   -Wl,-build-id \
-  -L${TOP_DIR}/third_party/llvm-project/build/lib \
-  -Wl,-rpath,${TOP_DIR}/third_party/llvm-project/build/lib \
+  -nostdinc++ -nostdlib++ \
+  -I${TOP_DIR}/third_party/llvm-project/install/include/ \
+  -I${TOP_DIR}/third_party/llvm-project/install/include/x86_64-unknown-linux-gnu/c++/v1/ \
+  -I${TOP_DIR}/third_party/llvm-project/install/include/c++/v1 \
+  -L${TOP_DIR}/third_party/llvm-project/install/lib \
+  -Wl,-rpath,${TOP_DIR}/third_party/llvm-project/install/lib \
+  -lc++ -lc++abi \
 "
-
 
 set -e
 set -x
@@ -93,8 +100,7 @@ function compile_bazel () {
   --config=memprof \
   --linkopt=-Wl,-O0" \
   --copt="-fmemory-profile=${TESTDATA_PATH}" \
-  --copt="-fprofile-generate=${TESTDATA_PATH}" \
-  --subcommands
+  --copt="-fprofile-generate=${TESTDATA_PATH}"
   eval "mv -f ${TOP_DIR}/bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
 }
 
