@@ -235,3 +235,15 @@ cc_proto_library(
     name = "object_layout_cc_proto",
     deps = [":object_layout_proto"],
 )
+
+
+cc_test(
+    name = "type_resolver_unit_test",
+    srcs = ["type_resolver_unit_test.cc"],
+    deps = [
+        ":type_resolver",
+        "@com_google_googletest//:gtest_main",
+        "@com_googlesource_code_re2//:re2",
+        "@com_google_absl//absl/strings",
+    ],
+)

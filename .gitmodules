@@ -15,3 +15,7 @@
 [submodule "third_party/DCPerf"]
 	path = third_party/DCPerf
 	url = git@github.com:mattweingarten/DCPerf.git
+[submodule "testsuite/clang-memprof"]
+	path = testsuite/clang-memprof
+	url = git@github.com:mattweingarten/llvm-project.git
+	branch = heapalloc

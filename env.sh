@@ -40,6 +40,8 @@ alias llvm-nm="${NM}"
 alias llvm-ranlib="${RANLIB}"
 alias llvm-profdata="${LLVM_BIN_DIR}/llvm-profdata"
 alias llvm-dwarfdump="${LLVM_BIN_DIR}/llvm-dwarfdump"
+alias readelf="${LLVM_BIN_DIR}/llvm-readelf"
+alias objdump="${LLVM_BIN_DIR}/llvm-objdump"
 
 # Python venv
 if [ -f "${TOP_DIR}/.venv/bin/activate" ]; then

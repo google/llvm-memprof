@@ -100,6 +100,17 @@ def _impl(ctx):
             flag_sets = [
                 flag_set(
                     actions = [
+                        "c++-compile",
+                        "c-compile",
+                        "cc-compile",
+                        "preprocess-assemble",
+                    ],
+                    flag_groups = [
+                        flag_group(flags = ["-DLLVM_MEMORY_PROFILER=1"]),
+                    ],
+                ),
+                flag_set(
+                    actions = [
                         "c-compile",
                         "c++-compile",
                         "cc-compile",
@@ -120,6 +131,7 @@ def _impl(ctx):
                                 "-mllvm", "-memprof-histogram",
                                 "-fno-exceptions",
                                 "-fPIC",
+                                "-flto",
                             ]
                         ),
                     ],
@@ -136,7 +148,11 @@ def _impl(ctx):
                                 "-Wl,-build-id",
                                 "-no-pie",
                                 "-fmemory-profile=.",
-                                "-fprofile-generate=."
+                                "-fprofile-generate=.",
+                                "-flto",
+                                "-lm",
+                                "-fno-plt",
+
                             ]
                         )
                     ],
@@ -150,6 +166,7 @@ def _impl(ctx):
         cxx_builtin_include_directories = [
             LLVM_ROOT + "/install/llvm/include/",
             LLVM_ROOT + "/install/lib/clang/21/include/",
+            LLVM_ROOT + "/install/lib/clang/21/include/sanitizer/",
             LLVM_ROOT + "/install/include/c++/v1",
             "/usr/include",
         ],
