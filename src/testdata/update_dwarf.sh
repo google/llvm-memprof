@@ -117,13 +117,13 @@ function run_and_copy_memprof () {
   memprof_raw=$(find $TESTDATA_PATH -name "memprof.profraw.*" -print -quit 2>/dev/null)
   eval "echo ${memprof_raw}"
   eval "mv -f ${memprof_raw} ${TESTDATA_PATH}/$1.memprofraw"
-  cat ${TESTDATA_PATH}/$1.memprofraw
 }
 
 function show_memprof () {
   eval "${PD} show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
   eval "rm -rf ${TESTDATA_PATH}/*.profraw || true"
   eval "bash ${TOP_DIR}/scripts/demangle_show.sh ${TESTDATA_PATH}/$1.show.yaml"
+  cat ${TESTDATA_PATH}/$1.show.yaml
 }
 
 # Initial dwarfmetadata test data.
