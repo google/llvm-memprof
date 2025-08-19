@@ -37,4 +37,4 @@ echo "Storing prebuilt LLVM tarball to $tmpfile"
 tar -I 'zstd -T0 --ultra -22 --long=29' -cf "$tmpfile" \
     -C "$(dirname "$src_dir")" "$(basename "$src_dir")"
 
-# aws s3 cp $tmpfile s3://memprof-prebuilt-llvm/llvm-install.tar.zst
+aws s3 cp $tmpfile s3://memprof-prebuilt-llvm/llvm-install.tar.zst
