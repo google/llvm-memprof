@@ -139,54 +139,56 @@ run_spec() {
 
 # ============CLANG====================
 clang_workloads=(
-  "llvm-dwarfdump"
-  "llvm-objdump"
-  "clang"
+  "input1.cpp"
 )
 
 build_clang() {
   echo "Building Clang..."
 
-  local LLVM_MEMPROF_DIR="${TOP_DIR}/third_party/llvm-project"
-
-  # mkdir -p "$CLANG_BUILD_DIR"
-  # cd "$CLANG_BUILD_DIR"
+  cd "${TESTSUITE_DIR}/clang-memprof"
+  mkdir -p build && cd build
 
   cmake -GNinja \
     -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_C_COMPILER="${LLVM_MEMPROF_DIR}/bin/clang" \
-    -DCMAKE_CXX_COMPILER="${LLVM_MEMPROF_DIR}/bin/clang++" \
-    -DCMAKE_LINKER="${LLVM_MEMPROF_DIR}/bin/lld" \
+    -DCMAKE_C_COMPILER="${LLVM_BIN_DIR}/clang" \
+    -DCMAKE_CXX_COMPILER="${LLVM_BIN_DIR}/clang++" \
+    -DCMAKE_LINKER="${LLVM_BIN_DIR}/lld" \
     -DLLVM_ENABLE_PROJECTS="clang" \
     -DLLVM_TARGETS_TO_BUILD="host" \
+    -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
     -DLLVM_ENABLE_LLD=ON \
-    -DCMAKE_C_FLAGS="-O2 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile -mllvm -memprof histogram" \
-    -DCMAKE_CXX_FLAGS="-O2 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile -mllvm -memprof histogram" \
+    -DCMAKE_C_FLAGS="-O3 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile=/tmp -fprofile-generate=/tmp -mllvm -memprof-histogram" \
+    -DCMAKE_CXX_FLAGS="-O3 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile=/tmp -fprofile-generate=/tmp -mllvm -memprof-histogram" \
+    -DCMAKE_EXE_LINKER_FLAGS="-flto=thin -Wl,-O3 \
+    -fprofile-generate=/tmp -fmemory-profile=/tmp \
+    -L/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
+    -Wl,-rpath,/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
+    -l:libclang_rt.memprof.a" \
+    -DCMAKE_SHARED_LINKER_FLAGS="-flto=thin -Wl,-O3 \
+    -fprofile-generate=/tmp -fmemory-profile=/tmp \
+    -L/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
+    -Wl,-rpath,/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
+    -l:libclang_rt.memprof.a" \
     ../llvm
-
-
-# cmake -GNinja   -DCMAKE_BUILD_TYPE=Debug   -DCMAKE_C_COMPILER="/home/wmatt/llvm-memprof/third_party/llvm-project/build/bin/clang"   -DCMAKE_CXX_COMPILER="/home/wmatt/llvm-memprof/third_party/llvm-project/build/bin/clang++"   -DCMAKE_LINKER="/home/wmatt/llvm-memprof/third_party/llvm-project/build/bin/lld"   -DLLVM_ENABLE_PROJECTS="clang"      -DLLVM_ENABLE_LLD=ON   -DCMAKE_C_FLAGS="-O2 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile -mllvm -memprof-histogram"   -DCMAKE_CXX_FLAGS="-O2 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile -mllvm -memprof-histogram"   ../llvm
-
-
-  echo "Starting Clang build..."
-  ninja clang
+  echo "Starting clang build"
+  ninja -j $(nproc)
   echo "Clang build completed."
 }
 
 run_clang() {
-  local selected_benchmarks="$1"
   echo "Processing CLANG workloads..."
-  for workload in "${clang_workloads[@]}" ; do
-    is_workload_selected "${workload}" "$@"
-    local is_selected=$?
-    if [[ "${is_selected}" -ne 0 ]]; then
-      continue
-    fi
-    echo "Processing CLANG workload: $workload"
-    dir="${TOP_DIR}/integration_tests/clang/tests/${workload}"
-    binary="${TOP_DIR}/${workload}"
-    process_workload_memory_profiles "$dir"  "$workload" "$binary"
-  done
+  local CLANG_BIN="${TESTSUITE_DIR}/clang-memprof/build/bin/"
+  local CLANG_WL="${TESTSUITE_DIR}/clang-inputs/"
+  
+  rm -rf *.profraw # Change to /tmp after
+  rm -rf *.profraw.* # Change to /tmp after
+
+  echo "Running clang++ with input1.cpp"
+  echo "${CLANG_BIN}/clang ${CLANG_WL}/input1.cpp -std=c++14 -O2 -c -o /tmp/input1.o"
+  eval "${CLANG_BIN}/clang ${CLANG_WL}/input1.cpp -std=c++14 -O2 -c -o /tmp/input1.o"
+  process_workload_memory_profiles "$(pwd)" "input1" "${CLANG_BIN}/clang" #change to tmp after
+
+
   echo "Finished processing CLANG workloads."
 }
 
@@ -266,6 +268,7 @@ function show_help() {
   echo "  --all         Run all workload categories (spec, clang, fleetbench, folly)."
   echo "  --build-spec  Build SPEC workloads."
   echo "  --spec        Run SPEC workloads."
+  echo "  --build-clang Build CLANG workloads."
   echo "  --clang       Run CLANG workloads."
   echo "  --fleetbench  Run Fleetbench workloads."
   echo "  --folly       Run Folly workloads."
@@ -387,6 +390,9 @@ elif [[ "$build_spec_flag" == true ]]; then
 elif [[ "$run_clang_flag" == true ]]; then
   echo "Running CLANG workloads."
   run_clang "${selected_benchmarks[@]}"
+elif [[ "$build_clang_flag" == true ]]; then
+  echo "Build CLANG."
+  build_clang
 elif [[ "$run_fleetbench_flag" == true ]]; then
   echo "Running Fleetbench workloads."
   run_fleetbench "${selected_benchmarks[@]}"

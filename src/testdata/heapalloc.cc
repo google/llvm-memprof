@@ -17,7 +17,7 @@ struct A {
   int y;
 };
 
-void foo(){
+void foo() {
   A* a = new A{1, 2};
   a->x = 10;
   delete a;
@@ -26,7 +26,6 @@ void foo(){
 
 int main() {
   A* a = new A{1, 2};
-  a->x = 10;
   a->x = 10;
   foo();
   return 0;
