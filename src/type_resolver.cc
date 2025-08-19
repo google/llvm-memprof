@@ -956,7 +956,6 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
           resolution_strategy.lookup_type, "absl::container_internal");
 
       /* ======== HARCODED ABSL CONTAINER VALUES for now ======== */
-      std::cout << absl::StrCat(absl_internal, "Group") << std::endl;
       absl::StatusOr<const DwarfMetadataFetcher::TypeData*> group_type_data_or =
           metadata_fetcher_->GetType(absl::StrCat(absl_internal, "::Group"));
       if (!group_type_data_or.ok()) {
@@ -964,8 +963,6 @@ DwarfTypeResolver::ResolveTypeFromResolutionStrategy(
         return absl::NotFoundError(BuildErrorMessageInResolution(
             formal_params, callstack, resolution_strategy,
             "Group type not found."));
-      } else {
-        std::cout << "Group found\n";
       }
       const DwarfMetadataFetcher::TypeData* group_type_data =
           group_type_data_or.value();

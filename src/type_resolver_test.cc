@@ -30,7 +30,7 @@
 #include "llvm/include/llvm/Object/Binary.h"
 #include "llvm/include/llvm/Object/BuildID.h"
 #include "llvm/include/llvm/Object/ObjectFile.h"
-#include "main/cpp/util/path.h"
+#include "src/main/cpp/util/path.h"
 #include "src/object_layout.pb.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
