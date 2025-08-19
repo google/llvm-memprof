@@ -39,19 +39,32 @@ jobs:
         ./init.sh --prebuilt-llvm
         source env.sh
         bazel --version
+        echo $TOP_DIR
+        echo $SCRIPTS_DIR
+        whereis clang
+        whereis clang++
+        whereis llvm-dwarfdump
+        whereis llvm-symbolizer
+        whereis llvm-profdata
+        whereis lld
+        whereis bazel
 
     - name: DwarfMetadata Fetcher Test
       run: |
+        source env.sh
         bazel run //src:dwarf_metadata_fetcher_test --verbose_failures --sandbox_debug
 
     - name: Type Resolver Unit Test
       run: |
+        source env.sh
         bazel run //src:type_resolver_unit_test --verbose_failures  --sandbox_debug
 
     - name: Type Resolver Test
       run: |
+        source env.sh
         bazel run //src:type_resolver_test --verbose_failures  --sandbox_debug
    
     - name: Histogram Builder Test
       run: |
+        source env.sh
         bazel run //src:histogram_builder_test --verbose_failures  --sandbox_debug

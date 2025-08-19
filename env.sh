@@ -21,7 +21,7 @@ export FLAMEGRAPH_DIR="${TOP_DIR}/third_party/FlameGraph"
 export LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/install/bin"
 export TESTSUITE_DIR="${TOP_DIR}/testsuite/"
 
-#Change open file limit.
+#Change open file limit for DCPerf.
 ulimit -n 65535
 
 export PATH="${LLVM_BIN_DIR}:$PATH"
