@@ -361,7 +361,6 @@ TEST(HistogramBuilderTest, SupportedAbseilContainersTest) {
 
   const TypeTreeStore* type_tree_store =
       histogram_builder_results->type_tree_store.get();
-  type_tree_store->Dump(std::cout, -1);
 
   EXPECT_GE(type_tree_store->callstack_to_type_tree_.size(), 6);
   for (const auto& [callstack, type_tree] :
