@@ -21,55 +21,31 @@
 #include <string>
 #include <utility>
 
-#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "binary_file_retriever.h"
-#include "dwarf_metadata_fetcher.h"
 #include "gtest/gtest.h"
-#include "llvm/include/llvm/Object/Binary.h"
-#include "llvm/include/llvm/Object/BuildID.h"
-#include "llvm/include/llvm/Object/ObjectFile.h"
-#include "src/main/cpp/util/path.h"
+#include "src/dwarf_metadata_fetcher.h"
 #include "src/object_layout.pb.h"
+#include "src/type_tree.h"
+#include "src/main/cpp/util/path.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
-#include "type_tree.h"
 
 namespace devtools_crosstool_fdo_field_access {
 
 namespace {
 
-static absl::StatusOr<std::string> GetBuildIdForLocalFile(
-    absl::string_view memprof_profiled_binary) {
-  llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> elfobj =
-      llvm::object::ObjectFile::createObjectFile(memprof_profiled_binary);
-  if (!elfobj) {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Cannot create object file for ", memprof_profiled_binary));
-  }
-  return llvm::toHex(::llvm::object::getBuildID(elfobj->getBinary()),
-                     /*lowercase=*/true);
-}
-
 constexpr uint64_t kDummyLineColNo = 0;
 
-constexpr const char* kTypeResolverTestPath = "src/testdata";
+constexpr const char *kTypeResolverTestPath = "src/testdata";
 
 // Basic type test. Checks if we can resolve a simple type into a full
 // TypeTree.
 TEST(TypeResolverTest, BasicTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "basic_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "056d411c166d583f";
   const std::string type_name = "A";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -107,16 +83,7 @@ TEST(TypeResolverTest, BasicTest) {
 TEST(TypeResolverTest, EmbeddedTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "embedded_type.dwarf");
-
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "79f61a072f0c57d1";
   const std::string type_name = "B";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -177,15 +144,8 @@ TEST(TypeResolverTest, EmbeddedTest) {
 TEST(TypeResolverTest, PaddingTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "padding_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "ebe406c70a15578d";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -252,15 +212,8 @@ TEST(TypeResolverTest, PaddingTypeTest) {
 TEST(TypeResolverTest, StdMapTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "std_map_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "25865f087139ad4e";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -270,124 +223,53 @@ TEST(TypeResolverTest, StdMapTypeTest) {
                                             /*force_update_cache=*/true));
   auto type_resolver =
       std::make_unique<DwarfTypeResolver>(std::move(dwarf_metadata_fetcher));
-  ASSERT_OK_AND_ASSIGN(std::unique_ptr<TypeTree> type_tree,
-                       type_resolver->ResolveTypeFromTypeName(
-                           "std::__1::__tree_node<std::__1::__value_type<"
-                           "unsigned long, A>, void *>"));
-
+  ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<TypeTree> type_tree,
+      type_resolver->ResolveTypeFromTypeName(
+          "std::_Rb_tree_node<std::pair<const unsigned long, A> >"));
   EXPECT_EQ(type_tree->Name(),
-            "std::__1::__tree_node<std::__1::__value_type<unsigned long, A>, "
-            "void *>");
+            "std::_Rb_tree_node<std::pair<const unsigned long, A> >");
   EXPECT_EQ(type_tree->Root()->GetTypeName(),
-            absl::string_view("std::__1::__tree_node<std::__1::__value_type<"
-                              "unsigned long, A>, void *>"));
+            "std::_Rb_tree_node<std::pair<const unsigned long, A> >");
   EXPECT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
   EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 56);
   EXPECT_EQ(type_tree->Root()->GetOffsetBytes(), 0);
   ASSERT_EQ(type_tree->Root()->NumChildren(), 2);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(),
+            "std::_Rb_tree_node_base");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetSizeBytes(), 32);
+  ASSERT_EQ(type_tree->Root()->GetChild(0)->NumChildren(), 5);
 
-  // === base: std::__1::__tree_node_base<void*>, size 32, 5 children
-  const auto* base = type_tree->Root()->GetChild(0);
-  EXPECT_EQ(base->GetTypeName(),
-            absl::string_view("std::__1::__tree_node_base<void *>"));
-  EXPECT_EQ(base->GetSizeBytes(), 32);
-  ASSERT_EQ(base->NumChildren(), 5);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(0)->GetTypeName(),
+            "unsigned int");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(0)->GetName(), "_M_color");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(1)->GetTypeName(), "");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(1)->IsPadding(), true);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(1)->GetName(), "");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(2)->GetTypeName(),
+            "std::_Rb_tree_node_base *");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(3)->GetTypeName(),
+            "std::_Rb_tree_node_base *");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(4)->GetTypeName(),
+            "std::_Rb_tree_node_base *");
+  EXPECT_EQ(type_tree->Root()->GetChild(1)->GetTypeName(),
+            "std::pair<const unsigned long, A>");
+  ASSERT_EQ(type_tree->Root()->GetChild(1)->NumChildren(), 2);
+  EXPECT_EQ(type_tree->Root()->GetChild(1)->GetChild(0)->GetTypeName(),
+            "unsigned long");
+  EXPECT_EQ(type_tree->Root()->GetChild(1)->GetChild(0)->GetName(), "first");
 
-  // [0] __end_node_type at +0, with inner __left_ pointer
-  EXPECT_EQ(
-      base->GetChild(0)->GetTypeName(),
-      absl::string_view(
-          "std::__1::__tree_end_node<std::__1::__tree_node_base<void *> *>"));
-  EXPECT_EQ(base->GetChild(0)->GetName(), absl::string_view("__end_node_type"));
-  ASSERT_EQ(base->GetChild(0)->NumChildren(), 1);
-  EXPECT_EQ(base->GetChild(0)->GetChild(0)->GetTypeName(),
-            absl::string_view("std::__1::__tree_node_base<void *> *"));
-  EXPECT_EQ(base->GetChild(0)->GetChild(0)->GetName(),
-            absl::string_view("__left_"));
-  EXPECT_TRUE(base->GetChild(0)->GetChild(0)->IsIndirectionType());
-  EXPECT_EQ(base->GetChild(0)->GetChild(0)->GetGlobalOffsetBytes(), 0);
-
-  // [1] __right_ pointer at +8
-  EXPECT_EQ(
-      base->GetChild(1)->GetTypeName(),
-      absl::string_view(
-          "std::__1::__tree_node_base_types<void *>::__node_base_type *"));
-  EXPECT_EQ(base->GetChild(1)->GetName(), absl::string_view("__right_"));
-  EXPECT_TRUE(base->GetChild(1)->IsIndirectionType());
-  EXPECT_EQ(base->GetChild(1)->GetGlobalOffsetBytes(), 8);
-
-  // [2] __parent_ pointer at +16
-  EXPECT_EQ(base->GetChild(2)->GetTypeName(),
-            absl::string_view(
-                "std::__1::__tree_node_base_types<void *>::__end_node_type *"));
-  EXPECT_EQ(base->GetChild(2)->GetName(), absl::string_view("__parent_"));
-  EXPECT_TRUE(base->GetChild(2)->IsIndirectionType());
-  EXPECT_EQ(base->GetChild(2)->GetGlobalOffsetBytes(), 16);
-
-  // [3] __is_black_ bool at +24
-  EXPECT_EQ(base->GetChild(3)->GetTypeName(), absl::string_view("bool"));
-  EXPECT_EQ(base->GetChild(3)->GetName(), absl::string_view("__is_black_"));
-  EXPECT_EQ(base->GetChild(3)->GetGlobalOffsetBytes(), 24);
-
-  // [4] padding at +25, size 7
-  EXPECT_TRUE(base->GetChild(4)->IsPadding());
-  EXPECT_EQ(base->GetChild(4)->GetGlobalOffsetBytes(), 25);
-  EXPECT_EQ(base->GetChild(4)->GetSizeBytes(), 7);
-
-  const auto* value = type_tree->Root()->GetChild(1);
-  EXPECT_EQ(value->GetTypeName(),
-            absl::string_view("std::__1::__value_type<unsigned long, A>"));
-  EXPECT_EQ(value->GetName(), absl::string_view("__value_"));
-  EXPECT_EQ(value->GetSizeBytes(), 24);
-  EXPECT_EQ(value->GetGlobalOffsetBytes(), 32);
-  ASSERT_EQ(value->NumChildren(), 1);
-
-  // pair inside value: __cc_ (std::__1::pair<const unsigned long, A>)
-  const auto* pair = value->GetChild(0);
-  EXPECT_EQ(pair->GetTypeName(),
-            absl::string_view("std::__1::pair<const unsigned long, A>"));
-  EXPECT_EQ(pair->GetName(), absl::string_view("__cc_"));
-  EXPECT_EQ(pair->GetSizeBytes(), 24);
-  EXPECT_EQ(pair->GetGlobalOffsetBytes(), 32);
-  ASSERT_EQ(pair->NumChildren(), 2);
-
-  // first, second
-  EXPECT_EQ(pair->GetChild(0)->GetTypeName(),
-            absl::string_view("unsigned long"));
-  EXPECT_EQ(pair->GetChild(0)->GetName(), absl::string_view("first"));
-  EXPECT_EQ(pair->GetChild(0)->GetSizeBytes(), 8);
-  EXPECT_EQ(pair->GetChild(0)->GetGlobalOffsetBytes(), 32);
-
-  EXPECT_EQ(pair->GetChild(1)->GetTypeName(), absl::string_view("A"));
-  EXPECT_EQ(pair->GetChild(1)->GetName(), absl::string_view("second"));
-  ASSERT_EQ(pair->GetChild(1)->NumChildren(), 2);
-  EXPECT_EQ(pair->GetChild(1)->GetSizeBytes(), 16);
-  EXPECT_EQ(pair->GetChild(1)->GetGlobalOffsetBytes(), 40);
-
-  // A.{x,y}
-  EXPECT_EQ(pair->GetChild(1)->GetChild(0)->GetTypeName(),
-            absl::string_view("double"));
-  EXPECT_EQ(pair->GetChild(1)->GetChild(0)->GetName(), absl::string_view("x"));
-  EXPECT_EQ(pair->GetChild(1)->GetChild(0)->GetGlobalOffsetBytes(), 40);
-
-  EXPECT_EQ(pair->GetChild(1)->GetChild(1)->GetTypeName(),
-            absl::string_view("double"));
-  EXPECT_EQ(pair->GetChild(1)->GetChild(1)->GetName(), absl::string_view("y"));
-  EXPECT_EQ(pair->GetChild(1)->GetChild(1)->GetGlobalOffsetBytes(), 48);
+  EXPECT_EQ(type_tree->Root()->GetChild(1)->GetChild(0)->GetSizeBytes(), 8);
+  EXPECT_EQ(type_tree->Root()->GetChild(1)->GetChild(1)->GetTypeName(), "A");
+  EXPECT_EQ(type_tree->Root()->GetChild(1)->GetChild(1)->GetName(), "second");
+  ASSERT_EQ(type_tree->Root()->GetChild(1)->GetChild(1)->NumChildren(), 2);
 }
 
 TEST(TypeResolverTest, UnionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "union_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "bac290aca8128893";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -429,15 +311,8 @@ TEST(TypeResolverTest, UnionTypeTest) {
 TEST(TypeResolverTest, ArrayTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "array_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "f1747dd609fe8c60";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -537,15 +412,8 @@ TEST(TypeResolverTest, ArrayTypeTest) {
 TEST(TypeResolverTest, VectorTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "vector_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "9d9de85561da7496";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -555,10 +423,9 @@ TEST(TypeResolverTest, VectorTypeTest) {
                                             /*force_update_cache=*/true));
   auto type_resolver =
       std::make_unique<DwarfTypeResolver>(std::move(dwarf_metadata_fetcher));
-  ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<TypeTree> type_tree,
-      type_resolver->ResolveTypeFromTypeName(
-          "std::__1::vector<double, std::__1::allocator<double> >"));
+  ASSERT_OK_AND_ASSIGN(std::unique_ptr<TypeTree> type_tree,
+                       type_resolver->ResolveTypeFromTypeName(
+                           "std::vector<double, std::allocator<double> >"));
   EXPECT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
 }
 
@@ -617,173 +484,90 @@ TEST(TypeResolverTest, CreateFromObjectLayoutTest) {
 TEST(TypeResolverTest, FieldAccessHistogramTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "std_map_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
-  // std::unique_ptr<BinaryFileRetriever> mock_retriever =
-  //     BinaryFileRetriever::CreateMockRetriever({{linker_build_id,
-  //     dwarf_path}});
-  // auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
-  //     std::move(mock_retriever), ::testing::TempDir());
-  // ASSERT_OK(
-  //     dwarf_metadata_fetcher->FetchWithPath({{linker_build_id, dwarf_path}},
-  //                                           /*force_update_cache=*/true));
-  // auto type_resolver =
-  //     std::make_unique<DwarfTypeResolver>(std::move(dwarf_metadata_fetcher));
-  // ASSERT_OK_AND_ASSIGN(std::unique_ptr<TypeTree> type_tree,
-  //                      type_resolver->ResolveTypeFromTypeName(
-  //                          "std::__1::__tree_node<std::__1::__value_"
-  //                          "type<unsigned long, A>, void *>"));
-  // ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
-  // uint32_t histogram_size = 7;
-  // uint64_t histogram[7] = {1, 2, 3, 4, 5, 6, 7};
+  const std::string linker_build_id = "25865f087139ad4e";
 
-  // ASSERT_OK(type_tree->RecordAccessHistogram(histogram, histogram_size));
-  // ASSERT_OK_AND_ASSIGN(
-  //     std::unique_ptr<FieldAccessHistogram> field_access_histogram,
-  //     FieldAccessHistogram::Create(type_tree.get()));
+  std::unique_ptr<BinaryFileRetriever> mock_retriever =
+      BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
+  auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
+      std::move(mock_retriever), ::testing::TempDir());
+  ASSERT_OK(
+      dwarf_metadata_fetcher->FetchWithPath({{linker_build_id, dwarf_path}},
+                                            /*force_update_cache=*/true));
+  auto type_resolver =
+      std::make_unique<DwarfTypeResolver>(std::move(dwarf_metadata_fetcher));
+  ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<TypeTree> type_tree,
+      type_resolver->ResolveTypeFromTypeName(
+          "std::_Rb_tree_node<std::pair<const unsigned long, A> >"));
+  ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
+  uint32_t histogram_size = 7;
+  uint64_t histogram[7] = {1, 2, 3, 4, 5, 6, 7};
 
-  // // libc++ __tree_node_base<void*>: parent, left, right (8B each),
-  // __is_black_
-  // // (1B) + padding (7B) Value (__value_type / pair<const unsigned long, A>)
-  // // starts at +32: first(8B), A{x(8B), y(8B)}.
+  ASSERT_OK(type_tree->RecordAccessHistogram(histogram, histogram_size));
+  ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<FieldAccessHistogram> field_access_histogram,
+      FieldAccessHistogram::Create(type_tree.get()));
+  ASSERT_EQ(field_access_histogram->nodes_.size(), 8);
+  // Check offsets.
+  EXPECT_EQ(field_access_histogram->nodes_[0]->GetGlobalOffsetBytes(), 0);
+  EXPECT_EQ(field_access_histogram->nodes_[1]->GetGlobalOffsetBytes(), 4);
+  EXPECT_EQ(field_access_histogram->nodes_[2]->GetGlobalOffsetBytes(), 8);
+  EXPECT_EQ(field_access_histogram->nodes_[3]->GetGlobalOffsetBytes(), 16);
+  EXPECT_EQ(field_access_histogram->nodes_[4]->GetGlobalOffsetBytes(), 24);
+  EXPECT_EQ(field_access_histogram->nodes_[5]->GetGlobalOffsetBytes(), 32);
+  EXPECT_EQ(field_access_histogram->nodes_[6]->GetGlobalOffsetBytes(), 40);
+  EXPECT_EQ(field_access_histogram->nodes_[7]->GetGlobalOffsetBytes(), 48);
 
-  // ASSERT_EQ(field_access_histogram->nodes_.size(), 8);
+  // Check sizes.
+  EXPECT_EQ(field_access_histogram->nodes_[0]->GetSizeBytes(), 4);
+  EXPECT_EQ(field_access_histogram->nodes_[1]->GetSizeBytes(), 4);
+  EXPECT_EQ(field_access_histogram->nodes_[2]->GetSizeBytes(), 8);
+  EXPECT_EQ(field_access_histogram->nodes_[3]->GetSizeBytes(), 8);
+  EXPECT_EQ(field_access_histogram->nodes_[4]->GetSizeBytes(), 8);
+  EXPECT_EQ(field_access_histogram->nodes_[5]->GetSizeBytes(), 8);
+  EXPECT_EQ(field_access_histogram->nodes_[6]->GetSizeBytes(), 8);
+  EXPECT_EQ(field_access_histogram->nodes_[7]->GetSizeBytes(), 8);
 
-  // // Offsets (ascending)
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetGlobalOffsetBytes(),
-  //           0);  // __parent_
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetGlobalOffsetBytes(),
-  //           8);  // __left_
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetGlobalOffsetBytes(),
-  //           16);  // __right_
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetGlobalOffsetBytes(),
-  //           24);  // __is_black_
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetGlobalOffsetBytes(),
-  //           25);  // padding
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetGlobalOffsetBytes(),
-  //           32);  // pair.first (const unsigned long)
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetGlobalOffsetBytes(),
-  //           40);  // A.x
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetGlobalOffsetBytes(),
-  //           48);  // A.y
+  // Check names.
+  EXPECT_EQ(field_access_histogram->nodes_[0]->GetName(), "_M_color");
+  EXPECT_EQ(field_access_histogram->nodes_[1]->GetName(), "");
+  EXPECT_EQ(field_access_histogram->nodes_[2]->GetName(), "_M_parent");
+  EXPECT_EQ(field_access_histogram->nodes_[3]->GetName(), "_M_left");
+  EXPECT_EQ(field_access_histogram->nodes_[4]->GetName(), "_M_right");
+  EXPECT_EQ(field_access_histogram->nodes_[5]->GetName(), "first");
+  EXPECT_EQ(field_access_histogram->nodes_[6]->GetName(), "x");
+  EXPECT_EQ(field_access_histogram->nodes_[7]->GetName(), "y");
 
-  // // Sizes
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetSizeBytes(), 1);
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetSizeBytes(), 7);
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetSizeBytes(), 8);
-
-  // // Names
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetName(), "__parent_");
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetName(), "__left_");
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetName(), "__right_");
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetName(), "__is_black_");
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetName(), "");  // padding
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetName(), "first");
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetName(), "x");
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetName(), "y");
-
-  // // Types
-  // EXPECT_TRUE(
-  //     field_access_histogram->nodes_[0]->IsIndirectionType());  // pointer
-  // EXPECT_TRUE(field_access_histogram->nodes_[1]->IsIndirectionType());
-  // EXPECT_TRUE(field_access_histogram->nodes_[2]->IsIndirectionType());
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetTypeName(), "bool");
-  // EXPECT_TRUE(field_access_histogram->nodes_[4]->IsPadding());
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetTypeName(),
-  //           "unsigned long");  // (const-ness may be stripped)
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetTypeName(), "double");
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetTypeName(), "double");
-
-  // The following is for GNU, for no we switch to libc++
-  // ==================================================
-
-  // ASSERT_OK_AND_ASSIGN(
-  //     std::unique_ptr<TypeTree> type_tree,
-  //     type_resolver->ResolveTypeFromTypeName(
-  //         "std::_Rb_tree_node<std::pair<const unsigned long, A> >"));
-  // ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
-  // uint32_t histogram_size = 7;
-  // uint64_t histogram[7] = {1, 2, 3, 4, 5, 6, 7};
-
-  // ASSERT_OK(type_tree->RecordAccessHistogram(histogram, histogram_size));
-  // ASSERT_OK_AND_ASSIGN(
-  //     std::unique_ptr<FieldAccessHistogram> field_access_histogram,
-  //     FieldAccessHistogram::Create(type_tree.get()));
-  // ASSERT_EQ(field_access_histogram->nodes_.size(), 8);
-  // // Check offsets.
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetGlobalOffsetBytes(), 0);
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetGlobalOffsetBytes(), 4);
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetGlobalOffsetBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetGlobalOffsetBytes(), 16);
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetGlobalOffsetBytes(), 24);
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetGlobalOffsetBytes(), 32);
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetGlobalOffsetBytes(), 40);
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetGlobalOffsetBytes(), 48);
-
-  // // Check sizes.
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetSizeBytes(), 4);
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetSizeBytes(), 4);
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetSizeBytes(), 8);
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetSizeBytes(), 8);
-
-  // // Check names.
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetName(), "_M_color");
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetName(), "");
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetName(), "_M_parent");
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetName(), "_M_left");
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetName(), "_M_right");
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetName(), "first");
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetName(), "x");
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetName(), "y");
-
-  // // Check types.
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetTypeName(), "unsigned
-  // int"); EXPECT_TRUE(field_access_histogram->nodes_[1]->IsPadding());
-  // EXPECT_TRUE(field_access_histogram->nodes_[2]->IsIndirectionType());
-  // EXPECT_TRUE(field_access_histogram->nodes_[3]->IsIndirectionType());
-  // EXPECT_TRUE(field_access_histogram->nodes_[4]->IsIndirectionType());
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetTypeName(), "unsigned
-  // long"); EXPECT_EQ(field_access_histogram->nodes_[6]->GetTypeName(),
-  // "double"); EXPECT_EQ(field_access_histogram->nodes_[7]->GetTypeName(),
-  // "double");
-  // ==================================================
+  // Check types.
+  EXPECT_EQ(field_access_histogram->nodes_[0]->GetTypeName(), "unsigned int");
+  EXPECT_TRUE(field_access_histogram->nodes_[1]->IsPadding());
+  EXPECT_TRUE(field_access_histogram->nodes_[2]->IsIndirectionType());
+  EXPECT_TRUE(field_access_histogram->nodes_[3]->IsIndirectionType());
+  EXPECT_TRUE(field_access_histogram->nodes_[4]->IsIndirectionType());
+  EXPECT_EQ(field_access_histogram->nodes_[5]->GetTypeName(), "unsigned long");
+  EXPECT_EQ(field_access_histogram->nodes_[6]->GetTypeName(), "double");
+  EXPECT_EQ(field_access_histogram->nodes_[7]->GetTypeName(), "double");
 
   // Check access counts.
-  // EXPECT_EQ(field_access_histogram->nodes_[0]->GetTotalAccessCount(), 1);
-  // EXPECT_EQ(field_access_histogram->nodes_[1]->GetTotalAccessCount(), 1);
-  // EXPECT_EQ(field_access_histogram->nodes_[2]->GetTotalAccessCount(), 2);
-  // EXPECT_EQ(field_access_histogram->nodes_[3]->GetTotalAccessCount(), 3);
-  // EXPECT_EQ(field_access_histogram->nodes_[4]->GetTotalAccessCount(), 4);
-  // EXPECT_EQ(field_access_histogram->nodes_[5]->GetTotalAccessCount(), 5);
-  // EXPECT_EQ(field_access_histogram->nodes_[6]->GetTotalAccessCount(), 6);
-  // EXPECT_EQ(field_access_histogram->nodes_[7]->GetTotalAccessCount(), 7);
+  EXPECT_EQ(field_access_histogram->nodes_[0]->GetTotalAccessCount(), 1);
+  EXPECT_EQ(field_access_histogram->nodes_[1]->GetTotalAccessCount(), 1);
+  EXPECT_EQ(field_access_histogram->nodes_[2]->GetTotalAccessCount(), 2);
+  EXPECT_EQ(field_access_histogram->nodes_[3]->GetTotalAccessCount(), 3);
+  EXPECT_EQ(field_access_histogram->nodes_[4]->GetTotalAccessCount(), 4);
+  EXPECT_EQ(field_access_histogram->nodes_[5]->GetTotalAccessCount(), 5);
+  EXPECT_EQ(field_access_histogram->nodes_[6]->GetTotalAccessCount(), 6);
+  EXPECT_EQ(field_access_histogram->nodes_[7]->GetTotalAccessCount(), 7);
 
-  // // Check offset mapping.
-  // ASSERT_EQ(field_access_histogram->offset_to_idx_.size(), 8);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(0), 0);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(4), 1);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(8), 2);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(16), 3);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(24), 4);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(32), 5);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(40), 6);
-  // EXPECT_EQ(field_access_histogram->offset_to_idx_.at(48), 7);
+  // Check offset mapping.
+  ASSERT_EQ(field_access_histogram->offset_to_idx_.size(), 8);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(0), 0);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(4), 1);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(8), 2);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(16), 3);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(24), 4);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(32), 5);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(40), 6);
+  EXPECT_EQ(field_access_histogram->offset_to_idx_.at(48), 7);
 }
 
 // Tests if we can correctly merge access counts from one TypeTree to another.
@@ -881,15 +665,8 @@ TEST(TypeResolverTest, MergeAccessCountsTest) {
 TEST(TypeResolverTest, SimpleRecordAccessTest) {
   const std::string dwarf_path = blaze_util::JoinPath(
       kTypeResolverTestPath, "simple_record_access_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "f5412ed20726e01a";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -983,15 +760,8 @@ TEST(TypeResolverTest, SimpleRecordAccessTest) {
 TEST(TypeResolverTest, ArrayAccessCountTest) {
   const std::string dwarf_path = blaze_util::JoinPath(
       kTypeResolverTestPath, "array_access_count_test.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "158c92614fde7e6d";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -1145,15 +915,8 @@ TEST(TypeResolverTest, ArrayAccessCountTest) {
 TEST(TypeResolverTest, VectorUniquePointerTest) {
   const std::string dwarf_path = blaze_util::JoinPath(
       kTypeResolverTestPath, "vector_unique_pointer_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "15e2e949dd6612ad";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -1171,36 +934,26 @@ TEST(TypeResolverTest, VectorUniquePointerTest) {
       std::unique_ptr<TypeTree> type_tree,
       type_resolver->ResolveTypeFromResolutionStrategy(
           DwarfTypeResolver::ContainerResolutionStrategy(
-              "std::__1::vector",
-              "_ZNSt3__119__allocate_at_leastB8se210000INS_9allocatorINS_"
-              "10unique_ptrI1ANS_14default_deleteIS3_EEEEEEEENS_19__allocation_"
-              "resultINS_16allocator_traitsIT_E7pointerEEERSA_m",
+              "std::vector",
+              "_ZNSt15__new_allocatorISt10unique_ptrI1ASt14default_deleteIS1_"
+              "EEE8allocateEmPKv",
               DwarfTypeResolver::ContainerResolutionStrategy::
                   kAllocatorAllocate),
           {DwarfMetadataFetcher::Frame(
-              "_ZNSt3__119__allocate_at_leastB8se210000INS_9allocatorINS_"
-              "10unique_ptrI1ANS_14default_deleteIS3_EEEEEEEENS_19__allocation_"
-              "resultINS_16allocator_traitsIT_E7pointerEEERSA_m",
+              "_ZNSt15__new_allocatorISt10unique_ptrI1ASt14default_deleteIS1_"
+              "EEE8allocateEmPKv",
               kDummyLineColNo, kDummyLineColNo)},
           /*request_size=*/-1));
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
-  EXPECT_EQ(type_tree->Name(),
-            "std::__1::unique_ptr<A, std::__1::default_delete<A> >");
+  EXPECT_EQ(type_tree->Name(), "std::unique_ptr<A, std::default_delete<A> >");
 }
 
 // This test checks if we can resolve function types in containers..
 TEST(TypeResolverTest, VectorFunctionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "vector_function_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "fbdb062b430f6c94";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -1218,35 +971,24 @@ TEST(TypeResolverTest, VectorFunctionTypeTest) {
       std::unique_ptr<TypeTree> type_tree,
       type_resolver->ResolveTypeFromResolutionStrategy(
           DwarfTypeResolver::ContainerResolutionStrategy(
-              "std::__1::vector",
-              "_ZNSt3__116allocator_traitsINS_9allocatorINS_"
-              "8functionIFvRK1AiEEEEEE7destroyB8se210000IS7_vTnNS_9enable_"
-              "ifIXntsr13__has_destroyIS8_PT_EE5valueEiE4typeELi0EEEvRS8_SD_",
+              "std::vector",
+              "_ZNSt15__new_allocatorISt8functionIFvRK1AiEEE8allocateEmPKv",
               DwarfTypeResolver::ContainerResolutionStrategy::
                   kAllocatorAllocate),
           {DwarfMetadataFetcher::Frame(
-              "_ZNSt3__116allocator_traitsINS_9allocatorINS_"
-              "8functionIFvRK1AiEEEEEE7destroyB8se210000IS7_vTnNS_9enable_"
-              "ifIXntsr13__has_destroyIS8_PT_EE5valueEiE4typeELi0EEEvRS8_SD_",
+              "_ZNSt15__new_allocatorISt8functionIFvRK1AiEEE8allocateEmPKv",
               kDummyLineColNo, kDummyLineColNo)},
           /*request_size=*/-1));
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
-  EXPECT_EQ(type_tree->Name(), "std::__1::function<void (const A &, int)>");
+  EXPECT_EQ(type_tree->Name(), "std::function<void (const A &, int)>");
 }
 
 // This test checks if we can resolve const pointers in containers.
 TEST(TypeResolverTest, ConstPointerTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "const_pointer_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "51bded6ccf11062e";
+
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
       BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
   auto dwarf_metadata_fetcher = std::make_unique<DwarfMetadataFetcher>(
@@ -1264,17 +1006,12 @@ TEST(TypeResolverTest, ConstPointerTest) {
       std::unique_ptr<TypeTree> type_tree,
       type_resolver->ResolveTypeFromResolutionStrategy(
           DwarfTypeResolver::ContainerResolutionStrategy(
-              "std::__1::vector",
-              "_ZNSt3__116allocator_traitsINS_"
-              "9allocatorIPK1AEEE7destroyB8se210000IS4_vTnNS_9enable_"
-              "ifIXntsr13__has_destroyIS5_PT_EE5valueEiE4typeELi0EEEvRS5_SA_",
+              "std::vector", "_ZNSt15__new_allocatorIPK1AE8allocateEmPKv",
               DwarfTypeResolver::ContainerResolutionStrategy::
                   kAllocatorAllocate),
           {DwarfMetadataFetcher::Frame(
-              "_ZNSt3__116allocator_traitsINS_"
-              "9allocatorIPK1AEEE7destroyB8se210000IS4_vTnNS_9enable_"
-              "ifIXntsr13__has_destroyIS5_PT_EE5valueEiE4typeELi0EEEvRS5_SA_",
-              kDummyLineColNo, kDummyLineColNo)},
+              "_ZNSt15__new_allocatorIPK1AE8allocateEmPKv", kDummyLineColNo,
+              kDummyLineColNo)},
           /*request_size=*/-1));
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
   EXPECT_EQ(type_tree->Name(), "A*");
@@ -1362,15 +1099,7 @@ TEST(TypeResolverTest, TypeTreeMergeTest) {
 TEST(TypeResolverTest, SimpleUnionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "simple_union_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "237d613e3cc628de";
   const std::string type_name = "SimpleUnion";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1410,15 +1139,7 @@ TEST(TypeResolverTest, SimpleUnionTypeTest) {
 TEST(TypeResolverTest, AnonymousUnionTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "anonymous_union_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "b9994af308c2237f";
   const std::string type_name = "AnonymousUnion";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1474,15 +1195,7 @@ TEST(TypeResolverTest, AnonymousUnionTypeTest) {
 TEST(TypeResolverTest, StdOptionalTypeTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "std_optional_type.dwarf");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "0d4667e5e9c4f29f";
   const std::string type_name = "B";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1505,110 +1218,96 @@ TEST(TypeResolverTest, StdOptionalTypeTest) {
   //   std::optional<A> a;
   // };
   ASSERT_TRUE(type_tree->Verify(/*verify_verbose=*/true));
-
-  // Root: B { a: std::__1::optional<A> }
   EXPECT_EQ(type_tree->Root()->GetName(), "B");
   EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 12);
   ASSERT_EQ(type_tree->Root()->NumChildren(), 1);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetName(), "a");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(), "std::optional<A>");
+  ASSERT_EQ(type_tree->Root()->GetChild(0)->NumChildren(), 1);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(0)->GetName(),
+            "_Optional_base<A, true, true>");
 
-  const auto* opt = type_tree->Root()->GetChild(0);
-  EXPECT_EQ(opt->GetName(), "a");
-  EXPECT_EQ(opt->GetTypeName(), "std::__1::optional<A>");
-  EXPECT_EQ(opt->GetSizeBytes(), 12);
-  ASSERT_EQ(opt->NumChildren(), 1);
-
-  // Chain of internal bases
-  const auto* move_assign = opt->GetChild(0);
-  EXPECT_EQ(move_assign->GetName(), "__optional_move_assign_base<A, true>");
-  EXPECT_EQ(move_assign->GetTypeName(),
-            "std::__1::__optional_move_assign_base<A, true>");
-  ASSERT_EQ(move_assign->NumChildren(), 1);
-
-  const auto* copy_assign = move_assign->GetChild(0);
-  EXPECT_EQ(copy_assign->GetName(), "__optional_copy_assign_base<A, true>");
-  EXPECT_EQ(copy_assign->GetTypeName(),
-            "std::__1::__optional_copy_assign_base<A, true>");
-  ASSERT_EQ(copy_assign->NumChildren(), 1);
-
-  const auto* move_base = copy_assign->GetChild(0);
-  EXPECT_EQ(move_base->GetName(), "__optional_move_base<A, true>");
-  EXPECT_EQ(move_base->GetTypeName(),
-            "std::__1::__optional_move_base<A, true>");
-  ASSERT_EQ(move_base->NumChildren(), 1);
-
-  const auto* copy_base = move_base->GetChild(0);
-  EXPECT_EQ(copy_base->GetName(), "__optional_copy_base<A, true>");
-  EXPECT_EQ(copy_base->GetTypeName(),
-            "std::__1::__optional_copy_base<A, true>");
-  ASSERT_EQ(copy_base->NumChildren(), 1);
-
-  const auto* storage_base = copy_base->GetChild(0);
-  EXPECT_EQ(storage_base->GetName(), "__optional_storage_base<A, false>");
-  EXPECT_EQ(storage_base->GetTypeName(),
-            "std::__1::__optional_storage_base<A, false>");
-  EXPECT_EQ(storage_base->GetSizeBytes(), 12);
-  ASSERT_EQ(storage_base->NumChildren(), 1);
-
-  // Destruct base with union + engaged + padding
-  const auto* destruct_base = storage_base->GetChild(0);
-  EXPECT_EQ(destruct_base->GetName(), "__optional_destruct_base<A, true>");
-  EXPECT_EQ(destruct_base->GetTypeName(),
-            "std::__1::__optional_destruct_base<A, true>");
-  EXPECT_EQ(destruct_base->GetSizeBytes(), 12);
-  ASSERT_EQ(destruct_base->NumChildren(), 3);
-
-  // [0] anonymous union holding A __val_ at offset 0, size 8
-  const auto* anon_union = destruct_base->GetChild(0);
-  EXPECT_EQ(anon_union->GetName(), "");
-  EXPECT_EQ(anon_union->GetTypeName(),
-            "std::__1::__optional_destruct_base<A, true>::Anon_75");
-  EXPECT_EQ(anon_union->GetGlobalOffsetBytes(), 0);
-  EXPECT_EQ(anon_union->GetSizeBytes(), 8);
-  ASSERT_EQ(anon_union->NumChildren(), 2);
-
-  const auto* a_val = anon_union->GetChild(1);
-  EXPECT_EQ(a_val->GetName(), "__val_");
-  EXPECT_EQ(a_val->GetTypeName(), "A");
-  EXPECT_EQ(a_val->GetGlobalOffsetBytes(), 0);
-  EXPECT_EQ(a_val->GetSizeBytes(), 8);
-  ASSERT_EQ(a_val->NumChildren(), 2);
-
-  EXPECT_EQ(a_val->GetChild(0)->GetName(), "x");
-  EXPECT_EQ(a_val->GetChild(0)->GetTypeName(), "int");
-  EXPECT_EQ(a_val->GetChild(0)->GetGlobalOffsetBytes(), 0);
-  EXPECT_EQ(a_val->GetChild(0)->GetSizeBytes(), 4);
-
-  EXPECT_EQ(a_val->GetChild(1)->GetName(), "y");
-  EXPECT_EQ(a_val->GetChild(1)->GetTypeName(), "int");
-  EXPECT_EQ(a_val->GetChild(1)->GetGlobalOffsetBytes(), 4);
-  EXPECT_EQ(a_val->GetChild(1)->GetSizeBytes(), 4);
-
-  // [1] engaged flag at offset 8, size 1
-  const auto* engaged = destruct_base->GetChild(1);
-  EXPECT_EQ(engaged->GetName(), "__engaged_");
-  EXPECT_EQ(engaged->GetTypeName(), "bool");
-  EXPECT_EQ(engaged->GetGlobalOffsetBytes(), 8);
-  EXPECT_EQ(engaged->GetSizeBytes(), 1);
-
-  // [2] padding at offset 9, size 3
-  const auto* pad = destruct_base->GetChild(2);
-  EXPECT_TRUE(pad->IsPadding());
-  EXPECT_EQ(pad->GetGlobalOffsetBytes(), 9);
-  EXPECT_EQ(pad->GetSizeBytes(), 3);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(0)->GetTypeName(),
+            "std::_Optional_base<A, true, true>");
+  ASSERT_EQ(type_tree->Root()->GetChild(0)->GetChild(0)->NumChildren(), 1);
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetChild(0)->GetChild(0)->GetName(),
+            "_M_payload");
+  EXPECT_EQ(
+      type_tree->Root()->GetChild(0)->GetChild(0)->GetChild(0)->GetTypeName(),
+      "std::_Optional_payload<A, true, true, true>");
+  ASSERT_EQ(
+      type_tree->Root()->GetChild(0)->GetChild(0)->GetChild(0)->NumChildren(),
+      1);
+  EXPECT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetTypeName(),
+            "std::_Optional_payload_base<A>");
+  ASSERT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->NumChildren(),
+            3);
+  EXPECT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetTypeName(),
+            "std::_Optional_payload_base<A>::_Storage<A, true>");
+  EXPECT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(1)
+                ->GetTypeName(),
+            "bool");
+  EXPECT_TRUE(type_tree->Root()
+                  ->GetChild(0)
+                  ->GetChild(0)
+                  ->GetChild(0)
+                  ->GetChild(0)
+                  ->GetChild(2)
+                  ->IsPadding());
+  // Payload.
+  ASSERT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->NumChildren(),
+            2);
+  EXPECT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(1)
+                ->GetTypeName(),
+            "A");
+  ASSERT_EQ(type_tree->Root()
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(0)
+                ->GetChild(1)
+                ->NumChildren(),
+            2);
 }
 
 TEST(TypeResolverTest, SimpleProtoTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "proto_simple.dwp");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "";
   const std::string type_name = "testdata::Record";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1632,8 +1331,7 @@ TEST(TypeResolverTest, SimpleProtoTest) {
   EXPECT_EQ(type_tree->Root()->GetTypeName(), "testdata::Record");
   EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 32);
   ASSERT_EQ(type_tree->Root()->NumChildren(), 2);
-  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(),
-            "google::protobuf::Message");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(), "google::protobuf::Message");
   EXPECT_EQ(type_tree->Root()->GetChild(0)->GetSizeBytes(), 16);
   EXPECT_EQ(type_tree->Root()->GetChild(1)->GetTypeName().substr(0, 16),
             "testdata::Record");
@@ -1653,15 +1351,7 @@ TEST(TypeResolverTest, SimpleProtoTest) {
 TEST(TypeResolverTest, ComplexProtoTest) {
   const std::string dwarf_path =
       blaze_util::JoinPath(kTypeResolverTestPath, "proto_complex.dwp");
-  auto status_or = GetBuildIdForLocalFile(dwarf_path);
-  std::string linker_build_id;
-  if (status_or.ok()) {
-    linker_build_id = status_or.value();
-  } else {
-    linker_build_id = "";
-    LOG(WARNING) << "Failed to get build id for local file: "
-                 << status_or.status() << " continuing with empty build id.";
-  }
+  const std::string linker_build_id = "";
   const std::string type_name = "testdata::SearchResponse";
 
   std::unique_ptr<BinaryFileRetriever> mock_retriever =
@@ -1680,15 +1370,13 @@ TEST(TypeResolverTest, ComplexProtoTest) {
   EXPECT_EQ(type_tree->Root()->GetTypeName(), "testdata::SearchResponse");
   EXPECT_EQ(type_tree->Root()->GetSizeBytes(), 72);
   ASSERT_EQ(type_tree->Root()->NumChildren(), 2);
-  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(),
-            "google::protobuf::Message");
+  EXPECT_EQ(type_tree->Root()->GetChild(0)->GetTypeName(), "google::protobuf::Message");
   EXPECT_EQ(type_tree->Root()->GetChild(0)->GetSizeBytes(), 16);
   ASSERT_EQ(type_tree->Root()->GetChild(1)->NumChildren(), 1);
   ASSERT_EQ(type_tree->Root()->GetChild(1)->GetChild(0)->NumChildren(), 3);
   EXPECT_EQ(
       type_tree->Root()->GetChild(1)->GetChild(0)->GetChild(0)->GetTypeName(),
-      "google::protobuf::internal::MapField<testdata::SearchResponse_"
-      "ResultsByPageEntry_"
+      "google::protobuf::internal::MapField<testdata::SearchResponse_ResultsByPageEntry_"
       "DoNotUse, int, testdata::Result, "
       "(google::protobuf::internal::WireFormatLite::FieldType)5, "
       "(google::protobuf::internal::WireFormatLite::FieldType)11>");

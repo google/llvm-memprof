@@ -44,7 +44,7 @@ function process_workload_memory_profiles() {
   local binary_path="$3"
 
   find "$profile_dir" -maxdepth 1 -type f -name "memprof.profraw.*" -print0 | while IFS= read -r -d $'\0' profile_file; do
-    local full_command="$base_command \"$binary_path\" --memprof_profile \"$profile_file\""
+    local full_command="$base_command \"$binary_path\" --memprof_profile \"$profile_file\" --verify_verbose"
 
     local typetree="$OUT/${workload}.typetree"
     echo "$full_command --verify_verbose 2> $OUT/${workload}.verbose 1>  $typetree"
@@ -76,42 +76,11 @@ function process_workload_memory_profiles() {
 
  # ============SPEC====================
 spec_workloads=(
+  "541.leela_r"
+  "523.xalancbmk_r"
   "508.namd_r"
   "510.parest_r"
-  "520.omnetpp_r"
-  "523.xalancbmk_r"
-  "541.leela_r"
 )
-build_spec(){
-  echo "Building SPEC..."
-
-  # Get rid of nusance code that prevents building with clang. Clang has no flag that will accept this error...
-  find "${SPEC_DIR}" \( -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
-    -exec sed -i "s|(s\.c_str() != '\\\\0') || (\*endptr == '\\\\0')|(!s.empty() || (*endptr == '\\0'))|g" {} +
-
-  # Copy cfg into spec directory
-  cp "${TOP_DIR}/cfg/memprof.cfg" "${SPEC_DIR}/config/memprof.cfg"
-
-  # Replace LLVM_PATH in memprof.cfg with absolute path of this repo
-  sed -i "s|^[[:space:]]*LLVM_PATH[[:space:]]*=.*|LLVM_PATH = ${TOP_DIR}/third_party/llvm-project/|" "${SPEC_DIR}/config/memprof.cfg"
-
-  cd $SPEC_DIR
-  source shrc
-  for workload in "${spec_workloads[@]}"; do
-    echo "Scrub workload: $workload"
-    build_cmd="runcpu --config=memprof --action=scrub ${workload}"
-    echo ${build_cmd}
-    ${build_cmd}
-    echo "Building workload: $workload"
-    build_cmd="runcpu --config=memprof --action=build ${workload}"
-    echo ${build_cmd}
-    ${build_cmd}
-    echo "Running and collecting memory profiles for: $workload"
-    build_cmd="runcpu --config=memprof --action=run --copies=1 --iterations=1 --tune=base --size=test ${workload}"
-    echo ${build_cmd}
-    ${build_cmd}
-  done
-}
 run_spec() {
   echo "Processing SPEC workloads..."
   for workload in "${spec_workloads[@]}"; do
@@ -127,8 +96,8 @@ run_spec() {
       workload_name=("cpuxalan_r")
     fi
 
-    profile_dir="$SPEC_DIR/benchspec/CPU/$workload/run/run_base_test_mytest-m64.0000/"
-    binary_path="$SPEC_DIR/benchspec/CPU/$workload/run/run_base_test_mytest-m64.0000/${workload_name}_base.mytest-m64"
+    profile_dir="$SPEC_DIR/$workload/build/build_peak_mytest-m64.0000/default_%p.memprof.profraw/"
+    binary_path="$SPEC_DIR/$workload/build/build_peak_mytest-m64.0000/${workload_name}_memprof"
     
     process_workload_memory_profiles "$profile_dir" "$workload_name" "$binary_path"
   done
@@ -139,56 +108,25 @@ run_spec() {
 
 # ============CLANG====================
 clang_workloads=(
-  "input1.cpp"
+  "llvm-dwarfdump"
+  "llvm-objdump"
+  "clang"
 )
 
-build_clang() {
-  echo "Building Clang..."
-
-  cd "${TESTSUITE_DIR}/clang-memprof"
-  mkdir -p build && cd build
-
-  cmake -GNinja \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_C_COMPILER="${LLVM_BIN_DIR}/clang" \
-    -DCMAKE_CXX_COMPILER="${LLVM_BIN_DIR}/clang++" \
-    -DCMAKE_LINKER="${LLVM_BIN_DIR}/lld" \
-    -DLLVM_ENABLE_PROJECTS="clang" \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-    -DLLVM_ENABLE_LLD=ON \
-    -DCMAKE_C_FLAGS="-O3 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile=/tmp -fprofile-generate=/tmp -mllvm -memprof-histogram" \
-    -DCMAKE_CXX_FLAGS="-O3 -g -fuse-ld=lld -Wl,--no-rosegment -fno-exceptions -fdebug-info-for-profiling -fPIC -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile=/tmp -fprofile-generate=/tmp -mllvm -memprof-histogram" \
-    -DCMAKE_EXE_LINKER_FLAGS="-flto=thin -Wl,-O3 \
-    -fprofile-generate=/tmp -fmemory-profile=/tmp \
-    -L/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
-    -Wl,-rpath,/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
-    -l:libclang_rt.memprof.a" \
-    -DCMAKE_SHARED_LINKER_FLAGS="-flto=thin -Wl,-O3 \
-    -fprofile-generate=/tmp -fmemory-profile=/tmp \
-    -L/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
-    -Wl,-rpath,/home/wmatt/llvm-memprof/third_party/llvm-project/install/lib \
-    -l:libclang_rt.memprof.a" \
-    ../llvm
-  echo "Starting clang build"
-  ninja -j $(nproc)
-  echo "Clang build completed."
-}
-
 run_clang() {
+  local selected_benchmarks="$1"
   echo "Processing CLANG workloads..."
-  local CLANG_BIN="${TESTSUITE_DIR}/clang-memprof/build/bin/"
-  local CLANG_WL="${TESTSUITE_DIR}/clang-inputs/"
-  
-  rm -rf *.profraw # Change to /tmp after
-  rm -rf *.profraw.* # Change to /tmp after
-
-  echo "Running clang++ with input1.cpp"
-  echo "${CLANG_BIN}/clang ${CLANG_WL}/input1.cpp -std=c++14 -O2 -c -o /tmp/input1.o"
-  eval "${CLANG_BIN}/clang ${CLANG_WL}/input1.cpp -std=c++14 -O2 -c -o /tmp/input1.o"
-  process_workload_memory_profiles "$(pwd)" "input1" "${CLANG_BIN}/clang" #change to tmp after
-
-
+  for workload in "${clang_workloads[@]}" ; do
+    is_workload_selected "${workload}" "$@"
+    local is_selected=$?
+    if [[ "${is_selected}" -ne 0 ]]; then
+      continue
+    fi
+    echo "Processing CLANG workload: $workload"
+    dir="${TOP_DIR}/integration_tests/clang/tests/${workload}"
+    binary="${TOP_DIR}/${workload}"
+    process_workload_memory_profiles "$dir"  "$workload" "$binary"
+  done
   echo "Finished processing CLANG workloads."
 }
 
@@ -228,7 +166,7 @@ function run_fleetbench() {
     fi
     # Step 1: Build and Run Fleetbench workload with Memprof
     rm /tmp/memprof.profraw.*
-    BUILD_FLEETBENCH_CMD="bazel run --fission=no --strip=never  \
+    BUILD_FLEETBENCH_CMD="blaze run --fission=no --strip=never --config=memprof \
     -c dbg --fdo_instrument=/tmp \
     --copt=-g --copt=-fdebug-info-for-profiling --copt=-O0 \
     --copt=-mllvm --copt=-memprof-histogram --copt=-fdebug-info-for-profiling \
@@ -239,7 +177,7 @@ function run_fleetbench() {
     echo "$BUILD_FLEETBENCH_CMD"
     eval "$BUILD_FLEETBENCH_CMD"
     rm -rf /tmp/${workload}
-    cp bazel-bin/third_party/fleetbench/${build_target}/${workload} /tmp/${workload}
+    cp blaze-bin/third_party/fleetbench/${build_target}/${workload} /tmp/${workload}
     
     # Step 2: Process the workload memory profiles
     process_workload_memory_profiles "/tmp" "${workload}" "/tmp/${workload}"
@@ -266,9 +204,7 @@ function show_help() {
   echo "Usage: $0 [OPTIONS]"
   echo "Options:"
   echo "  --all         Run all workload categories (spec, clang, fleetbench, folly)."
-  echo "  --build-spec  Build SPEC workloads."
   echo "  --spec        Run SPEC workloads."
-  echo "  --build-clang Build CLANG workloads."
   echo "  --clang       Run CLANG workloads."
   echo "  --fleetbench  Run Fleetbench workloads."
   echo "  --folly       Run Folly workloads."
@@ -295,7 +231,6 @@ function show_help() {
 
 
 #======MAIN====================================================================: 
-[[ -n "${TOP_DIR:-}" ]] || { echo "ERROR: TOP_DIR empty. Are you sure you sourced the environment? (source env.sh)" >&2; exit 1; }
 
 current_datetime=$(date "+%Y-%m-%d_%H-%M-%S")
 curr_experiment="${current_datetime}"
@@ -309,10 +244,8 @@ echo "$OUT"
 
 # Process command-line arguments
 run_all=false
-build_spec_flag=false
 run_spec_flag=false
 run_clang_flag=false
-build_clang_flag=false
 run_fleetbench_flag=false
 run_folly_flag=false
 benchmark_provided=false
@@ -325,14 +258,8 @@ while [[ $# -gt 0 ]]; do
     --all)
       run_all=true
       ;;
-    --build-spec)
-      build_spec_flag=true
-      ;;
     --spec)
       run_spec_flag=true
-      ;;
-    --build-clang)
-      build_clang_flag=true
       ;;
     --clang)
       run_clang_flag=true
@@ -375,35 +302,28 @@ fi
 
 echo "Selected benchmarks: ${selected_benchmarks[@]}"
 
-if [[ "$run_all" == true ]]; then
+if $run_all; then
   echo "Running all workload categories."
   run_spec "${selected_benchmarks[@]}"
   run_clang "${selected_benchmarks[@]}"
   run_fleetbench "${selected_benchmarks[@]}"
   run_folly
-elif [[ "$run_spec_flag" == true ]]; then
+elif $run_spec_flag; then
   echo "Running SPEC workloads."
   run_spec "${selected_benchmarks[@]}"
-elif [[ "$build_spec_flag" == true ]]; then
-  echo "Building SPEC and getting memprof."
-  build_spec
-elif [[ "$run_clang_flag" == true ]]; then
+elif $run_clang_flag; then
   echo "Running CLANG workloads."
   run_clang "${selected_benchmarks[@]}"
-elif [[ "$build_clang_flag" == true ]]; then
-  echo "Build CLANG."
-  build_clang
-elif [[ "$run_fleetbench_flag" == true ]]; then
+elif $run_fleetbench_flag; then
   echo "Running Fleetbench workloads."
   run_fleetbench "${selected_benchmarks[@]}"
-elif [[ "$run_folly_flag" == true ]]; then
+elif $run_folly_flag; then
   echo "Running Folly workloads."
   run_folly "${selected_benchmarks[@]}"
 else
   echo "No workloads specified. Use --all or a specific category/benchmark."
   show_help
 fi
-
 exit 0
 
 

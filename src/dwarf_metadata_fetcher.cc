@@ -46,6 +46,7 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "binary_file_retriever.h"
+#include "status_macros.h"
 #include "llvm/include/llvm/BinaryFormat/Dwarf.h"
 #include "llvm/include/llvm/DebugInfo/DIContext.h"
 #include "llvm/include/llvm/DebugInfo/DWARF/DWARFDie.h"
@@ -56,12 +57,11 @@
 #include "llvm/include/llvm/Object/ObjectFile.h"
 #include "llvm/include/llvm/Support/Debug.h"
 #include "llvm/include/llvm/Support/raw_ostream.h"
-#include "status_macros.h"
 
 // Wrappers for allocated types.
 const absl::string_view kMembufWrappers[] = {
-    "__gnu_cxx::__aligned_membuf",  // in std::map and std::set
-    "__gnu_cxx::__aligned_buffer",  // in unordered_map and unordered_set
+    "__gnu_cxx::__aligned_membuf", // in std::map and std::set
+    "__gnu_cxx::__aligned_buffer", // in unordered_map and unordered_set
 };
 
 constexpr std::string_view kAnonPrefix = "Anon_";
@@ -71,11 +71,10 @@ DwarfMetadataFetcher::DwarfMetadataFetcher(
     std::unique_ptr<BinaryFileRetriever> file_retriever, std::string cache_dir,
     bool should_read_subprograms, bool write_to_cache,
     uint32_t parse_thread_count)
-    : file_retriever_(std::move(file_retriever)),
-      cache_dir_(cache_dir),
+    : file_retriever_(std::move(file_retriever)), cache_dir_(cache_dir),
       should_read_subprograms_(should_read_subprograms),
-      write_to_cache_(write_to_cache),
-      parse_thread_count_(parse_thread_count) {}
+      write_to_cache_(write_to_cache), parse_thread_count_(parse_thread_count) {
+}
 
 absl::Status DwarfMetadataFetcher::ReadFromDWARF(const std::string &build_id,
                                                  const std::string &path,
@@ -135,9 +134,9 @@ absl::Status DwarfMetadataFetcher::FetchDWPWithPath(
   return absl::OkStatus();
 }
 
-absl::Status DwarfMetadataFetcher::Fetch(
-    const absl::flat_hash_set<std::string> &build_ids,
-    bool force_update_cache) {
+absl::Status
+DwarfMetadataFetcher::Fetch(const absl::flat_hash_set<std::string> &build_ids,
+                            bool force_update_cache) {
   absl::flat_hash_set<DwarfMetadataFetcher::BinaryInfo> build_ids_and_paths;
   for (const auto &build_id : build_ids) {
     build_ids_and_paths.insert({.build_id = build_id, .path = ""});
@@ -179,9 +178,9 @@ absl::Status DwarfMetadataFetcher::MetadataPack::PostProcessAndIndexTypeData(
   return absl::OkStatus();
 }
 
-static std::optional<std::string> ResolveSignature(
-    const llvm::DWARFDie &die,
-    const DwarfMetadataFetcher::ParseContext &context) {
+static std::optional<std::string>
+ResolveSignature(const llvm::DWARFDie &die,
+                 const DwarfMetadataFetcher::ParseContext &context) {
   std::optional<llvm::DWARFFormValue> sig_value =
       die.find(llvm::dwarf::DW_AT_signature);
   if (sig_value) {
@@ -211,18 +210,18 @@ static llvm::DWARFDie RecursiveGetTypeDIE(const llvm::DWARFDie &die) {
   }
 
   switch (die.getTag()) {
-    case llvm::dwarf::DW_TAG_structure_type:
-    case llvm::dwarf::DW_TAG_array_type:
-    case llvm::dwarf::DW_TAG_class_type:
-    case llvm::dwarf::DW_TAG_base_type:
-    case llvm::dwarf::DW_TAG_pointer_type:
-    case llvm::dwarf::DW_TAG_reference_type:
-    case llvm::dwarf::DW_TAG_union_type: {
-      return die;
-    }
-    default:
-      return RecursiveGetTypeDIE(
-          die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type));
+  case llvm::dwarf::DW_TAG_structure_type:
+  case llvm::dwarf::DW_TAG_array_type:
+  case llvm::dwarf::DW_TAG_class_type:
+  case llvm::dwarf::DW_TAG_base_type:
+  case llvm::dwarf::DW_TAG_pointer_type:
+  case llvm::dwarf::DW_TAG_reference_type:
+  case llvm::dwarf::DW_TAG_union_type: {
+    return die;
+  }
+  default:
+    return RecursiveGetTypeDIE(
+        die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type));
   }
 }
 
@@ -235,21 +234,21 @@ static llvm::DWARFDie RecursiveGetTypedefDIE(const llvm::DWARFDie &die) {
 }
 
 // Recursively get to root type definition die for formalparam.
-static llvm::DWARFDie RecursiveGetTypeDIEFormalParam(
-    const llvm::DWARFDie &die) {
+static llvm::DWARFDie
+RecursiveGetTypeDIEFormalParam(const llvm::DWARFDie &die) {
   if (!die.isValid()) {
     return die;
   }
 
   switch (die.getTag()) {
-    case llvm::dwarf::DW_TAG_structure_type:
-    case llvm::dwarf::DW_TAG_class_type:
-    case llvm::dwarf::DW_TAG_base_type:
-    case llvm::dwarf::DW_TAG_union_type:
-      return die;
-    default:
-      return RecursiveGetTypeDIEFormalParam(
-          die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type));
+  case llvm::dwarf::DW_TAG_structure_type:
+  case llvm::dwarf::DW_TAG_class_type:
+  case llvm::dwarf::DW_TAG_base_type:
+  case llvm::dwarf::DW_TAG_union_type:
+    return die;
+  default:
+    return RecursiveGetTypeDIEFormalParam(
+        die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type));
   }
 }
 
@@ -279,17 +278,17 @@ static std::string RecursiveGetName(const llvm::DWARFDie &die) {
   std::string sub_name = RecursiveGetName(
       die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type));
   switch (die.getTag()) {
-    case llvm::dwarf::DW_TAG_array_type:
-      return absl::StrCat(sub_name, "[]");
-    case llvm::dwarf::DW_TAG_pointer_type:
-    case llvm::dwarf::DW_TAG_ptr_to_member_type:
-      return absl::StrCat(sub_name, "*");
-    case llvm::dwarf::DW_TAG_reference_type:
-      return absl::StrCat(sub_name, "&");
-    case llvm::dwarf::DW_TAG_rvalue_reference_type:
-      return absl::StrCat(sub_name, "&&");
-    default:
-      return sub_name;
+  case llvm::dwarf::DW_TAG_array_type:
+    return absl::StrCat(sub_name, "[]");
+  case llvm::dwarf::DW_TAG_pointer_type:
+  case llvm::dwarf::DW_TAG_ptr_to_member_type:
+    return absl::StrCat(sub_name, "*");
+  case llvm::dwarf::DW_TAG_reference_type:
+    return absl::StrCat(sub_name, "&");
+  case llvm::dwarf::DW_TAG_rvalue_reference_type:
+    return absl::StrCat(sub_name, "&&");
+  default:
+    return sub_name;
   }
 }
 
@@ -314,8 +313,8 @@ static std::string GetTypeQualifiedName(const llvm::DWARFDie &die) {
   return full_type_name;
 }
 
-absl::Status DwarfMetadataFetcher::MetadataPack::TryUpdatePointerSize(
-    int64_t new_size) {
+absl::Status
+DwarfMetadataFetcher::MetadataPack::TryUpdatePointerSize(int64_t new_size) {
   if (pointer_size == 0) {
     pointer_size = new_size;
   } else if (pointer_size != new_size) {
@@ -545,8 +544,8 @@ std::string DwarfMetadataFetcher::ConsumeAngleBracket(
   return std::string(new_start, new_end);
 }
 
-std::optional<std::string> DwarfMetadataFetcher::UnwrapParameterizedStorage(
-    absl::string_view type_name) {
+std::optional<std::string>
+DwarfMetadataFetcher::UnwrapParameterizedStorage(absl::string_view type_name) {
   for (const auto &wrapper : kMembufWrappers) {
     if (type_name.compare(0, wrapper.size(), wrapper) == 0) {
       // Unwrap membuf typename. This means we consume angle brackets and
@@ -612,176 +611,163 @@ void DwarfMetadataFetcher::TypeData::VisitChildDIE(
     const ParseContext &context) {
   const llvm::dwarf::Tag die_tag = die.getTag();
   switch (die_tag) {
-    case llvm::dwarf::DW_TAG_namespace:
-    case llvm::dwarf::DW_TAG_class_type:
-    case llvm::dwarf::DW_TAG_structure_type:
-    case llvm::dwarf::DW_TAG_base_type:
-    case llvm::dwarf::DW_TAG_array_type:
-    case llvm::dwarf::DW_TAG_pointer_type:
-    case llvm::dwarf::DW_TAG_ptr_to_member_type:
-    case llvm::dwarf::DW_TAG_reference_type:
-    case llvm::dwarf::DW_TAG_rvalue_reference_type:
-    case llvm::dwarf::DW_TAG_enumeration_type:
-    case llvm::dwarf::DW_TAG_union_type: {
-      std::string child_name;
-      std::optional<std::string> signature_type_name =
-          ResolveSignature(die, context);
-      if (signature_type_name) {
-        child_name = *signature_type_name;
-      } else {
-        child_name = RecursiveGetNameOrResolveAnon(die);
-      }
-      if (child_name.empty()) {
-        LOG(ERROR) << "child_name is empty for die: \n";
-        die.dump();
-      }
-      if (!types.contains(child_name)) {
-        AddType(child_name, std::make_unique<TypeData>());
-      }
-      types[child_name]->ParseDIE(die, should_read_subprogram, context);
+  case llvm::dwarf::DW_TAG_namespace:
+  case llvm::dwarf::DW_TAG_class_type:
+  case llvm::dwarf::DW_TAG_structure_type:
+  case llvm::dwarf::DW_TAG_base_type:
+  case llvm::dwarf::DW_TAG_array_type:
+  case llvm::dwarf::DW_TAG_pointer_type:
+  case llvm::dwarf::DW_TAG_ptr_to_member_type:
+  case llvm::dwarf::DW_TAG_reference_type:
+  case llvm::dwarf::DW_TAG_rvalue_reference_type:
+  case llvm::dwarf::DW_TAG_enumeration_type:
+  case llvm::dwarf::DW_TAG_union_type: {
+    std::string child_name;
+    std::optional<std::string> signature_type_name =
+        ResolveSignature(die, context);
+    if (signature_type_name) {
+      child_name = *signature_type_name;
+    } else {
+      child_name = RecursiveGetNameOrResolveAnon(die);
+    }
+    if (child_name.empty()) {
+      LOG(ERROR) << "child_name is empty for die: \n";
+      die.dump();
+    }
+    if (!types.contains(child_name)) {
+      AddType(child_name, std::make_unique<TypeData>());
+    }
+    types[child_name]->ParseDIE(die, should_read_subprogram, context);
+    break;
+  }
+  case llvm::dwarf::DW_TAG_subprogram: {
+    if (!should_read_subprogram) {
       break;
     }
-    case llvm::dwarf::DW_TAG_subprogram: {
-      if (!should_read_subprogram) {
-        break;
-      }
-      auto child_name = die.getLinkageName();
+    auto child_name = die.getLinkageName();
+    if (child_name == nullptr) {
+      // This is important if an allocation is made in 'main' for heapalloc
+      // dwarf. This is because main does not have a
+      // linkage name.
+      child_name = die.getShortName();
       if (child_name == nullptr) {
-        // This is important if an allocation is made in 'main' for heapalloc
-        // dwarf. This is because main does not have a
-        // linkage name.
-        child_name = die.getShortName();
-        if (child_name == nullptr) {
-          break;
-        }
+        break;
       }
-      if (!types.contains(child_name)) {
-        types[child_name] = std::make_unique<TypeData>();
-      }
-      types[child_name]->ParseDIE(die, should_read_subprogram, context);
-      break;
     }
-    case llvm::dwarf::DW_TAG_GOOGLE_heapalloc: {
-      llvm::DWARFDie type_die =
-          die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
+    if (!types.contains(child_name)) {
+      types[child_name] = std::make_unique<TypeData>();
+    }
+    types[child_name]->ParseDIE(die, should_read_subprogram, context);
+    break;
+  }
+  case llvm::dwarf::DW_TAG_GOOGLE_heapalloc: {
+    llvm::DWARFDie type_die =
+        die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
 
-      type_die = RecursiveGetTypedefDIE(type_die);
-      if (!die.isValid()) {
-        break;
-      }
-      std::string type_name = GetTypeQualifiedName(type_die);
-      uint64_t line_offset = die.getDeclLine() - die.getParent().getDeclLine();
-      uint64_t col_number =
-          llvm::dwarf::toUnsigned(die.find(llvm::dwarf::DW_AT_decl_column), 0);
-      std::string func_name = "";
-      if (die.find(llvm::dwarf::DW_AT_name)) {
-        func_name = die.getShortName();
-      }
-      if (func_name == "") {
-        const char *linkage_name = die.getParent().getLinkageName();
-        if (linkage_name != nullptr) {
-          func_name = linkage_name;
-        }
-      }
-      if (func_name == "") {
-        auto spec_die = die.getParent().getAttributeValueAsReferencedDie(
-            llvm::dwarf::DW_AT_specification);
-        if (spec_die.isValid()) {
-          func_name = spec_die.getShortName();
-        }
-      }
-      heapalloc_sites.insert(
-          {Frame(func_name, line_offset, col_number), type_name});
+    type_die = RecursiveGetTypedefDIE(type_die);
+    if (!die.isValid()) {
       break;
     }
-    case llvm::dwarf::DW_TAG_typedef: {
-      std::string name = RecursiveGetName(die);
-      // Find the original canonical type
-      llvm::DWARFDie cur = die;
-      while (cur.isValid() && cur.getTag() == llvm::dwarf::DW_TAG_typedef) {
-        cur = cur.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
+    std::string type_name = GetTypeQualifiedName(type_die);
+    uint64_t line_offset = die.getDeclLine();
+    uint64_t col_number =
+        llvm::dwarf::toUnsigned(die.find(llvm::dwarf::DW_AT_decl_column), 0);
+    std::string func_name;
+    if (die.find(llvm::dwarf::DW_AT_name)) {
+      func_name = die.getShortName();
+    } else {
+      func_name = "";
+    }
+    heapalloc_sites.insert(
+        {Frame(func_name, line_offset, col_number), type_name});
+    break;
+  }
+  case llvm::dwarf::DW_TAG_typedef: {
+    std::string name = RecursiveGetName(die);
+    // Find the original canonical type
+    llvm::DWARFDie cur = die;
+    while (cur.isValid() && cur.getTag() == llvm::dwarf::DW_TAG_typedef) {
+      cur = cur.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
+    }
+    if (cur.isValid()) {
+      typedef_type[name] = GetTypeQualifiedName(cur);
+    }
+    break;
+  }
+  case llvm::dwarf::DW_TAG_member:
+  case llvm::dwarf::DW_TAG_inheritance: {
+    auto field = std::make_unique<FieldData>();
+    field->ParseDIE(die, context);
+    // Make sure we haven't already inserted somewhere else. This can happen
+    // if we have multiple instances of the same type with different
+    // instantiations.
+    bool skip_field = false;
+    for (const auto &f : fields) {
+      if (field->offset == f->offset && field->type_name == f->type_name &&
+          field->name == f->name) {
+        skip_field = true;
       }
-      if (cur.isValid()) {
-        typedef_type[name] = GetTypeQualifiedName(cur);
-      }
+    }
+    if (skip_field) {
       break;
     }
-    case llvm::dwarf::DW_TAG_member:
-    case llvm::dwarf::DW_TAG_inheritance: {
-      auto field = std::make_unique<FieldData>();
-      field->ParseDIE(die, context);
-      // Make sure we haven't already inserted somewhere else. This can happen
-      // if we have multiple instances of the same type with different
-      // instantiations.
-      bool skip_field = false;
-      for (const auto &f : fields) {
-        if (field->offset == f->offset && field->type_name == f->type_name &&
-            field->name == f->name) {
-          skip_field = true;
-        }
-      }
-      if (skip_field) {
-        break;
-      }
-      auto opt = UnwrapParameterizedStorage(field->type_name);
-      if (opt) {
-        field->type_name = opt.value();
-      }
-      if (field->offset >= 0) {
-        auto it = offset_idx.find(field->offset);
-        if (it == offset_idx.end()) {
-          absl::flat_hash_set<size_t> indices;
-          indices.insert(fields.size());
-          offset_idx[field->offset] = indices;
-        } else {
-          absl::flat_hash_set<size_t> *indices = &it->second;
+    auto opt = UnwrapParameterizedStorage(field->type_name);
+    if (opt) {
+      field->type_name = opt.value();
+    }
+    if (field->offset >= 0) {
+      auto it = offset_idx.find(field->offset);
+      if (it == offset_idx.end()) {
+        absl::flat_hash_set<size_t> indices;
+        indices.insert(fields.size());
+        offset_idx[field->offset] = indices;
+      } else {
+        absl::flat_hash_set<size_t> *indices = &it->second;
 
-          indices->insert(fields.size());
-        }
-        fields.push_back(std::move(field));
+        indices->insert(fields.size());
       }
+      fields.push_back(std::move(field));
+    }
+    break;
+  }
+  // For now we treat both template and formal parameters the same. In
+  // theory, they could be worth splitting up into separate cases.
+  case llvm::dwarf::DW_TAG_template_type_parameter:
+  case llvm::dwarf::DW_TAG_formal_parameter: {
+    // For now we use the dumpTypeQualifiedName method. Recursing walking
+    // through the dwarf DIEs does not lead to the correct typename.
+    // RecursiveGetName will not always work here.
+    auto formal_param_type = RecursiveGetTypeDIEFormalParam(die);
+    llvm::DWARFDie unit_reference =
+        formal_param_type.resolveTypeUnitReference();
+    const std::string formal_param_name = GetTypeQualifiedName(unit_reference);
+    if (formal_param_name.empty()) {
+      LOG(ERROR) << "formal_param_name is empty for formal param: \n";
+      die.dump();
+    }
+    if (std::find(formal_parameters.begin(), formal_parameters.end(),
+                  formal_param_name) == formal_parameters.end()) {
+      formal_parameters.push_back(formal_param_name);
+    }
+    break;
+  }
+  case llvm::dwarf::DW_TAG_template_value_parameter:
+  case llvm::dwarf::DW_TAG_variable: {
+    std::optional<llvm::DWARFFormValue> const_value =
+        die.find(llvm::dwarf::DW_AT_const_value);
+    if (!const_value) {
       break;
     }
-    // For now we treat both template and formal parameters the same. In
-    // theory, they could be worth splitting up into separate cases.
-    case llvm::dwarf::DW_TAG_template_type_parameter:
-    case llvm::dwarf::DW_TAG_formal_parameter: {
-      // For now we use the dumpTypeQualifiedName method. Recursing walking
-      // through the dwarf DIEs does not lead to the correct typename.
-      // RecursiveGetName will not always work here.
-      auto formal_param_type = RecursiveGetTypeDIEFormalParam(die);
-      llvm::DWARFDie unit_reference =
-          formal_param_type.resolveTypeUnitReference();
-      const std::string formal_param_name =
-          GetTypeQualifiedName(unit_reference);
-      if (formal_param_name.empty()) {
-        LOG(ERROR) << "formal_param_name is empty for formal param: \n";
-        die.dump();
-      }
-      if (std::find(formal_parameters.begin(), formal_parameters.end(),
-                    formal_param_name) == formal_parameters.end()) {
-        formal_parameters.push_back(formal_param_name);
-      }
+    const char *name = die.getShortName();
+    if (name == nullptr) {
       break;
     }
-    case llvm::dwarf::DW_TAG_template_value_parameter:
-    case llvm::dwarf::DW_TAG_variable: {
-      std::optional<llvm::DWARFFormValue> const_value =
-          die.find(llvm::dwarf::DW_AT_const_value);
-      if (!const_value) {
-        break;
-      }
-      const char *name = die.getShortName();
-      if (name == nullptr) {
-        break;
-      }
-      uint64_t const_value_as_unsigned =
-          llvm::dwarf::toUnsigned(const_value, 0);
-      constant_variables.insert({name, const_value_as_unsigned});
-      break;
-    }
-    default:
-      break;
+    uint64_t const_value_as_unsigned = llvm::dwarf::toUnsigned(const_value, 0);
+    constant_variables.insert({name, const_value_as_unsigned});
+    break;
+  }
+  default:
+    break;
   }
 }
 
@@ -790,50 +776,50 @@ void DwarfMetadataFetcher::TypeData::ParseDIE(const llvm::DWARFDie &die,
                                               const ParseContext &context) {
   const llvm::dwarf::Tag die_tag = die.getTag();
   switch (die_tag) {
-    case llvm::dwarf::DW_TAG_namespace: {
-      data_type = DataType::NAMESPACE;
-      break;
+  case llvm::dwarf::DW_TAG_namespace: {
+    data_type = DataType::NAMESPACE;
+    break;
+  }
+  case llvm::dwarf::DW_TAG_class_type: {
+    data_type = DataType::CLASS;
+    break;
+  }
+  case llvm::dwarf::DW_TAG_enumeration_type: {
+    data_type = DataType::ENUM;
+    break;
+  }
+  case llvm::dwarf::DW_TAG_structure_type: {
+    data_type = DataType::STRUCTURE;
+    break;
+  }
+  case llvm::dwarf::DW_TAG_base_type: {
+    data_type = DataType::BASE_TYPE;
+    break;
+  }
+  case llvm::dwarf::DW_TAG_array_type:
+  case llvm::dwarf::DW_TAG_pointer_type:
+  case llvm::dwarf::DW_TAG_ptr_to_member_type:
+  case llvm::dwarf::DW_TAG_reference_type:
+  case llvm::dwarf::DW_TAG_rvalue_reference_type: {
+    data_type = DataType::POINTER_LIKE;
+    break;
+  }
+  case llvm::dwarf::DW_TAG_subprogram: {
+    data_type = DataType::SUBPROGRAM;
+    const char *linkage_name = die.getLinkageName();
+    if (linkage_name != nullptr) {
+      name = linkage_name;
     }
-    case llvm::dwarf::DW_TAG_class_type: {
-      data_type = DataType::CLASS;
-      break;
-    }
-    case llvm::dwarf::DW_TAG_enumeration_type: {
-      data_type = DataType::ENUM;
-      break;
-    }
-    case llvm::dwarf::DW_TAG_structure_type: {
-      data_type = DataType::STRUCTURE;
-      break;
-    }
-    case llvm::dwarf::DW_TAG_base_type: {
-      data_type = DataType::BASE_TYPE;
-      break;
-    }
-    case llvm::dwarf::DW_TAG_array_type:
-    case llvm::dwarf::DW_TAG_pointer_type:
-    case llvm::dwarf::DW_TAG_ptr_to_member_type:
-    case llvm::dwarf::DW_TAG_reference_type:
-    case llvm::dwarf::DW_TAG_rvalue_reference_type: {
-      data_type = DataType::POINTER_LIKE;
-      break;
-    }
-    case llvm::dwarf::DW_TAG_subprogram: {
-      data_type = DataType::SUBPROGRAM;
-      const char *linkage_name = die.getLinkageName();
-      if (linkage_name != nullptr) {
-        name = linkage_name;
-      }
-      break;
-    }
-    case llvm::dwarf::DW_TAG_union_type: {
-      data_type = DataType::UNION;
-      break;
-    }
-    default: {
-      data_type = DataType::UNKNOWN;
-      break;
-    }
+    break;
+  }
+  case llvm::dwarf::DW_TAG_union_type: {
+    data_type = DataType::UNION;
+    break;
+  }
+  default: {
+    data_type = DataType::UNKNOWN;
+    break;
+  }
   }
   if (data_type == DataType::BASE_TYPE || data_type == DataType::CLASS ||
       data_type == DataType::STRUCTURE || data_type == DataType::UNION ||
@@ -857,8 +843,8 @@ void DwarfMetadataFetcher::TypeData::ParseDIE(const llvm::DWARFDie &die,
   }
 }
 
-std::vector<absl::string_view> DwarfMetadataFetcher::SplitNamespace(
-    absl::string_view type_name) {
+std::vector<absl::string_view>
+DwarfMetadataFetcher::SplitNamespace(absl::string_view type_name) {
   if (type_name.empty()) {
     return {};
   }
@@ -1003,8 +989,8 @@ DwarfMetadataFetcher::GetCacheableType(absl::string_view type_name) {
   }
 }
 
-absl::StatusOr<std::string> DwarfMetadataFetcher::GetHeapAllocType(
-    const Frame &frame) const {
+absl::StatusOr<std::string>
+DwarfMetadataFetcher::GetHeapAllocType(const Frame &frame) const {
   auto it = pack_.heapalloc_sites.find(frame);
   if (it == pack_.heapalloc_sites.end()) {
     return absl::NotFoundError(absl::StrCat(
@@ -1029,47 +1015,45 @@ std::unique_ptr<llvm::DWARFUnit>
 DwarfMetadataFetcher::DwarfParserState::getNextDwarfUnit() {
   m_.Lock();
   switch (curr_state_) {
-    case State::kTypesSectionUnits:
-      if (curr_it_ == dwarf_info_->types_section_units().begin()) {
-        LOG(INFO) << "starting parsing binary file"
-                  << "\n";
-      }
-      if (curr_it_ == dwarf_info_->types_section_units().end()) {
-        curr_it_ = dwarf_info_->info_section_units().begin();
-        curr_state_ = State::kInfoSectionUnits;
+  case State::kTypesSectionUnits:
+    if (curr_it_ == dwarf_info_->types_section_units().begin()) {
+      LOG(INFO) << "starting parsing binary file" << "\n";
+    }
+    if (curr_it_ == dwarf_info_->types_section_units().end()) {
+      curr_it_ = dwarf_info_->info_section_units().begin();
+      curr_state_ = State::kInfoSectionUnits;
+      m_.Unlock();
+      return getNextDwarfUnit();
+    }
+    break;
+  case State::kInfoSectionUnits:
+    if (curr_it_ == dwarf_info_->info_section_units().end()) {
+      if (dwp_dwarf_info_ != nullptr) {
+        curr_it_ = dwp_dwarf_info_->dwo_types_section_units().begin();
+        curr_state_ = State::kDwpTypesSectionUnits;
+        LOG(INFO) << "starting parsing dwp file" << "\n";
         m_.Unlock();
         return getNextDwarfUnit();
-      }
-      break;
-    case State::kInfoSectionUnits:
-      if (curr_it_ == dwarf_info_->info_section_units().end()) {
-        if (dwp_dwarf_info_ != nullptr) {
-          curr_it_ = dwp_dwarf_info_->dwo_types_section_units().begin();
-          curr_state_ = State::kDwpTypesSectionUnits;
-          LOG(INFO) << "starting parsing dwp file"
-                    << "\n";
-          m_.Unlock();
-          return getNextDwarfUnit();
-        } else {
-          m_.Unlock();
-          return nullptr;
-        }
-      }
-      break;
-    case State::kDwpTypesSectionUnits:
-      if (curr_it_ == dwp_dwarf_info_->dwo_types_section_units().end()) {
-        curr_it_ = dwp_dwarf_info_->dwo_info_section_units().begin();
-        curr_state_ = State::kDwpInfoSectionUnits;
-        m_.Unlock();
-        return getNextDwarfUnit();
-      }
-      break;
-    case State::kDwpInfoSectionUnits:
-      if (curr_it_ == dwp_dwarf_info_->dwo_info_section_units().end()) {
+      } else {
         m_.Unlock();
         return nullptr;
       }
-      break;
+    }
+    break;
+  case State::kDwpTypesSectionUnits:
+    if (curr_it_ == dwp_dwarf_info_->dwo_types_section_units().end()) {
+      curr_it_ = dwp_dwarf_info_->dwo_info_section_units().begin();
+      curr_state_ = State::kDwpInfoSectionUnits;
+      m_.Unlock();
+      return getNextDwarfUnit();
+    }
+    break;
+  case State::kDwpInfoSectionUnits:
+    if (curr_it_ == dwp_dwarf_info_->dwo_info_section_units().end()) {
+      m_.Unlock();
+      return nullptr;
+    }
+    break;
   }
   std::unique_ptr<llvm::DWARFUnit> next = std::move(*curr_it_);
   curr_it_++;

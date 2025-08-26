@@ -1,7 +1,3 @@
 numpy
 matplotlib
 PyYAML
-click
-pyyaml
-tabulate
-pandas

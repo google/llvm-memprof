@@ -37,27 +37,27 @@ def _impl(ctx):
     tool_paths = [
         tool_path(
             name = "gcc",
-            path = LLVM_ROOT + "/install/bin/clang",
+            path = LLVM_ROOT + "/build/bin/clang",
         ),
         tool_path(
             name = "clang",
-            path =  LLVM_ROOT + "/install/bin/clang",
+            path =  LLVM_ROOT + "/build/bin/clang",
         ),
         tool_path(
             name = "clang++",
-            path =  LLVM_ROOT + "/install/bin/clang++",
+            path =  LLVM_ROOT + "/build/bin/clang++",
         ),
         tool_path(
             name = "cpp",
-            path =  LLVM_ROOT + "/install/bin/clang++",
+            path =  LLVM_ROOT + "/build/bin/clang++",
         ),
         tool_path(
             name = "ar",
-            path =  LLVM_ROOT + "/install/bin/llvm-ar",
+            path =  LLVM_ROOT + "/build/bin/llvm-ar",
         ),
         tool_path(
             name = "ld",
-            path =  LLVM_ROOT + "/install/bin/lld",
+            path =  LLVM_ROOT + "/build/bin/lld",
         ),
         tool_path(
             name = "gcov",
@@ -94,80 +94,12 @@ def _impl(ctx):
                 ),
             ],
         ),
-        feature(
-            name = "memprof",
-            enabled = False,
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        "c++-compile",
-                        "c-compile",
-                        "cc-compile",
-                        "preprocess-assemble",
-                    ],
-                    flag_groups = [
-                        flag_group(flags = ["-DLLVM_MEMORY_PROFILER=1"]),
-                    ],
-                ),
-                flag_set(
-                    actions = [
-                        "c-compile",
-                        "c++-compile",
-                        "cc-compile",
-                        "preprocess-assemble",
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-g",
-                                "-fstandalone-debug",
-                                "-fdebug-info-for-profiling",
-                                "-mno-omit-leaf-frame-pointer",
-                                "-fno-omit-frame-pointer",
-                                "-fno-optimize-sibling-calls",
-                                "-m64",
-                                "-fmemory-profile=.",
-                                "-fprofile-generate=.",
-                                "-mllvm", "-memprof-histogram",
-                                "-fno-exceptions",
-                                "-fPIC",
-                                "-flto",
-                            ]
-                        ),
-                    ],
-                ),
-                flag_set(
-                    actions = all_link_actions,
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-fuse-ld=lld",
-                                "-fPIC",
-                                "-Wl,--no-rosegment",
-                                "-mno-omit-leaf-frame-pointer",
-                                "-Wl,-build-id",
-                                "-no-pie",
-                                "-fmemory-profile=.",
-                                "-fprofile-generate=.",
-                                "-flto",
-                                "-lm",
-                                "-fno-plt",
-
-                            ]
-                        )
-                    ],
-                )
-            ],
-        )
     ]
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         cxx_builtin_include_directories = [
-            LLVM_ROOT + "/install/llvm/include/",
-            LLVM_ROOT + "/install/lib/clang/21/include/",
-            LLVM_ROOT + "/install/lib/clang/21/include/sanitizer/",
-            LLVM_ROOT + "/install/include/c++/v1",
+            LLVM_ROOT + "/build/lib/",
             "/usr/include",
         ],
         features = features,
