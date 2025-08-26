@@ -1,0 +1,23 @@
+name: Clang Format Check
+
+on:
+  pull_request:
+    paths:
+      - 'src/**/*.cc'
+      - 'src/**/*.h'
+      - '!src/testdata/**'
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run clang-format Lint Action
+        uses: DoozyX/clang-format-lint-action@v0.18.2
+        with:
+          source: './src'
+          extensions: 'cc,h,cpp,hpp'
+          clangFormatVersion: 16
+          style: file
+          inplace: false

@@ -1,4 +1,9 @@
 *.dwp
+*.dwarf
+*.exe
+*.memprofraw
+*.show.yaml
+dwarfmetadata_testdata.cc
 basic_type.cc
 embedded_type.cc
 padding_type.cc
@@ -15,3 +20,7 @@ simple_union_type.cc
 anonymous_union_type.cc
 std_optional_type.cc
 simple_union_type.cc
+namespace_clash.cc
+namespace_field.cc
+namespace_typedef.cc
+enum_type.cc

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,66 +14,220 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
 
 # Regenerate dwarf binaries for type_resolver_test.
 
 # Setup environment and path.
 
+TOP_DIR="$(git rev-parse --show-toplevel)"
+LLVM_BIN_DIR="${TOP_DIR}/third_party/llvm-project/install/bin"
+
+
 readonly TESTDATA_PATH="${TOP_DIR}/src/testdata"
 
 readonly MEMPROF_FLAGS=" -fuse-ld=lld -Wl,--no-rosegment \
--fno-exceptions -fdebug-info-for-profiling -fPIC\
+-fno-exceptions -fdebug-info-for-profiling -fPIC \
 -mno-omit-leaf-frame-pointer \
 -fno-omit-frame-pointer -fno-optimize-sibling-calls \
 -m64 -Wl,-build-id -no-pie -fPIC -fmemory-profile \
 -mllvm -memprof-use-callbacks=true -mllvm -memprof-histogram"
 
-readonly CC_FLAGS="-g -gdwarf-5  -fuse-ld=lld -Wl,-build-id"
+# Make sure to build with C++20 and libc++ for consistency of tests.
+readonly CC_FLAGS="\
+  -std=c++20 \
+  -stdlib=libc++ \
+  -nostdinc++ \
+  -nostdlib++ \
+  -g -gdwarf-5 \
+  -fuse-ld=lld \
+  -Wl,-build-id \
+  -nostdinc++ -nostdlib++ \
+  -I${TOP_DIR}/third_party/llvm-project/install/include/ \
+  -I${TOP_DIR}/third_party/llvm-project/install/include/x86_64-unknown-linux-gnu/c++/v1/ \
+  -I${TOP_DIR}/third_party/llvm-project/install/include/c++/v1 \
+  -L${TOP_DIR}/third_party/llvm-project/install/lib \
+  -Wl,-rpath,${TOP_DIR}/third_party/llvm-project/install/lib \
+  -lc++ -lc++abi \
+"
 
 set -e
 set -x
 
-which clang
-which clang++
-which ld.lld
+CC="${LLVM_BIN_DIR}/clang"
+CXX="${LLVM_BIN_DIR}/clang++"
+DD="${LLVM_BIN_DIR}/llvm-dwarfdump"
+PD="${LLVM_BIN_DIR}/llvm-profdata"
+LLD="${LLVM_BIN_DIR}/ld.lld"
+
+which "${CC}"
+which "${CXX}"
+which "${DD}"
+which "${PD}"
+which "${LLD}"
+
+
+function clean_testdata () {
+  rm -rf ${TESTDATA_PATH}/*.dwarf || true
+  rm -rf ${TESTDATA_PATH}/*.dwp || true
+  rm -rf ${TESTDATA_PATH}/*.exe || true
+  rm -rf ${TESTDATA_PATH}/*.memprofraw || true
+  rm -rf ${TESTDATA_PATH}/*.profraw.* || true
+  rm -rf ${TESTDATA_PATH}/*.show.yaml || true
+  rm -rf ${TOP_DIR}/bazel-out/k8-dbg/bin/src/testdata/* || true
+}
 
 function compile_and_cp () {
-  eval "clang++ $CC_FLAGS ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.dwarf"
+  eval "${CXX} $CC_FLAGS ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.dwarf"
 }
 
 function compile_proto () {
-  eval "bazel build //src/testdata:$1 --features=-simple_template_names -c dbg --copt=-O0"
+  eval "bazel build //src/testdata:$1 \
+        --features=-simple_template_names \
+        -c dbg \
+        --copt=-O0 \
+        --copt=-g \
+        --copt=-gdwarf-5 \
+        --copt=-ggdb \
+        --strip=never"
   rm -rf ${TESTDATA_PATH}/$1.dwp || true
   cp bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.dwp || true
 }
 
-function compile_local () {
-  eval "clang++ -mllvm -memprof-use-callbacks=true \
-  -fPIC -fuse-ld=lld -Wl,--no-rosegment -g -fdebug-info-for-profiling \
-  -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls \
-  -m64 -Wl,-build-id -no-pie -fmemory-profile=${TESTDATA_PATH}\
-  ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.exe_test"
+function compile_bazel () {
+  eval "bazel build //src/testdata:$1 \
+  --copt=-O0 \
+  --config=memprof \
+  --linkopt=-Wl,-O0" \
+  --copt="-fmemory-profile=${TESTDATA_PATH}" \
+  --copt="-fprofile-generate=${TESTDATA_PATH}"
+  eval "mv -f ${TOP_DIR}/bazel-bin/src/testdata/$1 ${TESTDATA_PATH}/$1.exe"
 }
 
-function compile_bazel () {
-  eval "bazel run --config=memprof --fission=no --strip=never \
-  -c dbg --fdo_instrument=/tmp \ --copt=-fuse-ld=lld\
-  --copt=-g --copt=-fdebug-info-for-profiling --copt=-O0 \
-  --copt=-mllvm --copt=-memprof-histogram --copt=-fdebug-info-for-profiling \
-  --copt=-mno-omit-leaf-frame-pointer --copt=-fno-omit-frame-pointer \
-  --copt=-fno-optimize-sibling-calls \
-  --copt=-m64 --copt=-Wl,--copt=-build-id --copt=-fPIC \
-  --copt=-no-pie --copt=-fmemory-profile=${TESTDATA_PATH}\
-  //src/testdata:$1"
-  eval "mv bazel-bin/src/testdata/$1 ${TESTDATA_PATH}.exe_test"
+function compile_local () {
+  eval "${CXX} -O0 -mllvm -memprof-use-callbacks=true \
+  -mllvm -memprof-histogram \
+  -fPIC -fuse-ld=lld -Wl,--no-rosegment -g -fdebug-info-for-profiling \
+  -mno-omit-leaf-frame-pointer -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+  -m64 -Wl,-build-id -Wl,-no-pie -Wl,--build-id -stdlib=libstdc++ -fmemory-profile=${TESTDATA_PATH}\
+  ${TESTDATA_PATH}/$1.cc -o ${TESTDATA_PATH}/$1.exe"
 }
 
 function run_and_copy_memprof () {
-  eval "${TESTDATA_PATH}/$1.exe_test"
+  eval "${TESTDATA_PATH}/$1.exe"
   memprof_raw=$(find $TESTDATA_PATH -name "memprof.profraw.*" -print -quit 2>/dev/null)
   eval "echo ${memprof_raw}"
-  mv "${memprof_raw}" "${TESTDATA_PATH}/$1.memprofraw_test"
+  eval "mv -f ${memprof_raw} ${TESTDATA_PATH}/$1.memprofraw"
+}
+
+function show_memprof () {
+  eval "${PD} show  ${TESTDATA_PATH}/$1.memprofraw --profiled-binary=${TESTDATA_PATH}/$1.exe --memory > ${TESTDATA_PATH}/$1.show.yaml"
+  eval "rm -rf ${TESTDATA_PATH}/*.profraw || true"
+  eval "bash ${TOP_DIR}/scripts/demangle_show.sh ${TESTDATA_PATH}/$1.show.yaml"
+  cat ${TESTDATA_PATH}/$1.show.yaml
+}
+
+# Initial dwarfmetadata test data.
+function write_dwarfmetadata_testdata () {
+cat > ${TESTDATA_PATH}/dwarfmetadata_testdata.cc << EOF
+class Foo {
+ public:
+  class FooInsider {
+   public:
+    int a_;
+    int b_;
+    int c_;
+  };
+
+  Foo() {}
+  Foo(const Foo &other) {}
+  int a_;
+  char bad_pad_;
+  int *b_;
+  char b_arr_[32];
+  int **c_;
+};
+
+template <typename T>
+class Bar {
+ public:
+  class BarPublicInsider {
+   public:
+    int a_;
+    T t_;
+  };
+  T GetT() { return b_ + bpi_.t_ + bpi2_.t_; }
+  Foo c_;
+  Bar *d_;
+  Foo *e_;
+  Foo::FooInsider i_;
+  BarPublicInsider bpi_;
+
+ private:
+  class BarPrivateInsider {
+   public:
+    int a_;
+    T t_;
+    T **t_p_p_;
+  };
+  int a_;
+  T b_;
+  BarPrivateInsider bpi2_;
+};
+
+namespace AAA {
+namespace BBB {
+
+class CCC {
+ public:
+  CCC(double a, int b) {
+    ccc1 = b;
+    ccc2 = a;
+    fff.bad_pad_ = 'c';
+  }
+  CCC(int a) : ccc1(a) {}
+  CCC(){};
+  Foo fff;
+  int ccc1;
+  double ccc2;
+};
+
+class Foo {
+ public:
+  Foo() {}
+  int a;
+  int b;
+};
+
+class ChildFoo : Foo {
+ public:
+  ChildFoo() {}
+  int c;
+  int b;
+};
+
+}  // namespace BBB
+}  // namespace AAA
+
+typedef Foo FooFoo;
+typedef int int32_t;
+typedef int32_t myint32_t;
+typedef AAA::BBB::CCC MyCCC;
+
+int main() {
+  Bar<char> bar1;
+  Bar<int> bar2;
+  Bar<Foo> bar3;
+  Bar<Foo> bar4 = bar3;
+  Bar<AAA::BBB::CCC> bar5;
+  Bar<MyCCC> bar6;
+  FooFoo foofoo;
+  myint32_t i = 0;
+  AAA::BBB::CCC ccc(1.0, 2);
+  AAA::BBB::ChildFoo cf;
+  MyCCC ccc2(1);
+  return i;
+}
+EOF
 }
 
 # Basic type test with simple class.
@@ -106,6 +262,99 @@ public:
 
 int main(int argc, char **argv) {
   B* b = new B;
+  return 0;
+}
+EOF
+}
+# Enum type checks that we can recursively resolve types.
+function write_enum_type_test () {
+cat > ${TESTDATA_PATH}/enum_type.cc << EOF
+enum E { X = 1, Y = 2, Z = 3 };
+
+class A {
+public:
+  E e;
+  double x;
+};
+
+int main() {
+  A *a = new A;
+  return 0;
+}
+EOF
+}
+
+# Clashing names in different namespaces test.
+function write_namespace_clash_test () {
+cat > ${TESTDATA_PATH}/namespace_clash.cc << EOF
+namespace name1 {
+class A {
+ public:
+  long x;
+  long y;
+};
+}  // namespace name1
+
+namespace name2 {
+class A {
+ public:
+  double x;
+  double y;
+};
+}  // namespace name2
+
+int main() {
+  name1::A *a1 = new name1::A;
+  name2::A *a2 = new name2::A;
+  return 0;
+}
+EOF
+}
+
+# Field with type from different namespace test.
+function write_namespace_field_test () {
+cat > ${TESTDATA_PATH}/namespace_field.cc << EOF
+#include <string>
+
+namespace n1 {
+struct B {
+  long x;
+  B() : x(1) {}
+};
+}
+
+struct A {
+  long x;
+  std::string y;
+  n1::B b;
+  A() : x(1), y(""), b() {}
+};
+
+int main() {
+  A* a = new A;
+  n1::B* bobj = new n1::B;
+  return 0;
+}
+EOF
+}
+
+# Typedef into another namespace test.
+function write_namespace_typedef_test () {
+cat > ${TESTDATA_PATH}/namespace_typedef.cc << EOF
+namespace n1 {
+struct A {
+  double x;
+  double y;
+};
+}
+
+namespace n2 {
+typedef n1::A B;
+}
+
+int main() {
+  n1::A* a = new n1::A;
+  n2::B* b = new n2::B;
   return 0;
 }
 EOF
@@ -333,6 +582,7 @@ public:
 };
 int main(int argc, char **argv) {
   std::vector<std::unique_ptr<A>> As;
+  As.push_back(std::make_unique<A>());
 }
 EOF
 }
@@ -415,12 +665,22 @@ int main(int argc, char **argv) {
 EOF
 }
 
-
 main() {
+  clean_testdata
+  write_dwarfmetadata_testdata
+  compile_and_cp "dwarfmetadata_testdata"
   write_basic_type
   compile_and_cp "basic_type"
   write_embedded_type_test
   compile_and_cp "embedded_type"
+  write_enum_type_test
+  compile_and_cp "enum_type"
+  write_namespace_clash_test
+  compile_and_cp "namespace_clash"
+  write_namespace_field_test
+  compile_and_cp "namespace_field"
+  write_namespace_typedef_test
+  compile_and_cp "namespace_typedef"
   write_padding_type_test
   compile_and_cp "padding_type"
   write_map_type
@@ -448,14 +708,24 @@ main() {
   write_std_optional_type
   compile_and_cp "std_optional_type"
 
+  compile_bazel "heapalloc"
+  run_and_copy_memprof "heapalloc"
+  show_memprof "heapalloc"
+
+  compile_bazel "supported_stl_containers"
+  run_and_copy_memprof "supported_stl_containers"
+  show_memprof "supported_stl_containers"
+
+  compile_bazel "supported_adt_containers"
+  run_and_copy_memprof "supported_adt_containers"
+  show_memprof "supported_adt_containers"
+
+  compile_bazel "supported_abseil_containers"
+  run_and_copy_memprof "supported_abseil_containers"
+  show_memprof "supported_abseil_containers"
+
   compile_proto "proto_simple"
   compile_proto "proto_complex"
-
-  # Fix supported containers generation
-  # compile_local "supported_stl_containers"
-  # run_and_copy_memprof "supported_stl_containers"
-  # compile_bazel "supported_adt_containers"
-  # compile_bazel "supported_abseil_containers"
 }
 
 main

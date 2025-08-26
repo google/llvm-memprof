@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "src/type_tree.h"
+#include "type_tree.h"
 
 #include <sys/types.h>
 
@@ -143,7 +143,8 @@ void TypeTree::Node::Dump(std::ostream &out, int level,
   out << "global_offset: " << GetGlobalOffsetBytes() << "\n";
   if (!children.empty()) {
     DumpLevel(out, level);
-    out << "children: " << "\n";
+    out << "children: "
+        << "\n";
     // Print only the child of the union with the larger tree size. This is
     // heuristic to show which one is more likely to contain more relevant
     // information.
@@ -171,7 +172,8 @@ void TypeTree::Dump(std::ostream &out, int level, bool dump_full_unions) const {
     if (FromContainer()) {
       out << ContainerName() << "\n";
     } else {
-      out << "<none>" << "\n";
+      out << "<none>"
+          << "\n";
     }
     DumpLevel(out, level);
     out << "tree: \n";
@@ -234,7 +236,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
     if (this->GetOffsetBytes() != 0 && !this->IsPadding()) {
       if (verify_verbose) {
         LOG(ERROR) << "Union child offset not 0 where parent is union: "
-                   << GetOffsetBytes() << " != 0 for " << "\n"
+                   << GetOffsetBytes() << " != 0 for "
+                   << "\n"
                    << *this << "\n";
       }
       res = false;
@@ -280,7 +283,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
       if (child->GetOffsetBytes() != 0 && !child->IsPadding()) {
         if (verify_verbose) {
           LOG(ERROR) << "Union child offset not 0: " << child->GetOffsetBytes()
-                     << " != 0 for " << "\n"
+                     << " != 0 for "
+                     << "\n"
                      << *child << "on node: " << this->GetName() << "\n";
         }
         res = false;
@@ -306,7 +310,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
       if (verify_verbose) {
         LOG(ERROR) << "Total count mismatch: Total child access count "
                    << total_child_access_count << " < " << GetTotalAccessCount()
-                   << " for : " << "\n"
+                   << " for : "
+                   << "\n"
                    << *this << "\n";
       }
       res = false;
@@ -314,7 +319,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
     if (total_child_size != GetSizeBits()) {
       if (verify_verbose) {
         LOG(ERROR) << "Size mismatch: Total child size " << total_child_size
-                   << " != " << GetSizeBits() << " for : " << "\n"
+                   << " != " << GetSizeBits() << " for : "
+                   << "\n"
                    << *this << "\n";
       }
       res = false;
@@ -322,7 +328,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
   }
   if ((!IsPadding() && GetTypeName().empty())) {
     if (verify_verbose) {
-      LOG(ERROR) << "Not padding and empty type name for " << "\n"
+      LOG(ERROR) << "Not padding and empty type name for "
+                 << "\n"
                  << *this << "\n";
     }
     res = false;
@@ -331,7 +338,9 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
   // It is okay to have unresolved types, but we still want to print a message.
   if (IsUnresolvedType()) {
     if (verify_verbose) {
-      LOG(ERROR) << "Unresolved type for " << "\n" << *this << "\n";
+      LOG(ERROR) << "Unresolved type for "
+                 << "\n"
+                 << *this << "\n";
     }
   }
 
@@ -342,7 +351,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
       if (verify_verbose) {
         LOG(ERROR) << "Parent-Child Offset mismatch: " << GetGlobalOffsetBits()
                    << " != " << parent->GetGlobalOffsetBits() + GetOffsetBits()
-                   << " for " << "\n"
+                   << " for "
+                   << "\n"
                    << *this << "\n";
       }
       res = false;
@@ -351,7 +361,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
     if ((GetGlobalOffsetBits() != 0 || GetOffsetBits() != 0)) {
       if (verify_verbose) {
         LOG(ERROR) << "Root offset not 0: " << GetGlobalOffsetBits()
-                   << " != " << GetOffsetBits() << " for " << "\n"
+                   << " != " << GetOffsetBits() << " for "
+                   << "\n"
                    << *this << "\n";
       }
     }
@@ -382,7 +393,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
                    << " != " << GetOffsetBits() << " or "
                    << older_sibling->GetGlobalOffsetBits() << " + "
                    << older_sibling->GetSizeBits()
-                   << " != " << GetGlobalOffsetBits() << " for " << "\n"
+                   << " != " << GetGlobalOffsetBits() << " for "
+                   << "\n"
                    << *older_sibling << "\n"
                    << *this << "\n";
       }
@@ -392,7 +404,8 @@ bool TypeTree::Node::Verify(const Node *parent, const Node *older_sibling,
     if (GetOffsetBits() != 0) {
       if (verify_verbose) {
         LOG(ERROR) << "First child does not have offset of 0: "
-                   << GetOffsetBits() << " != 0 for " << "\n"
+                   << GetOffsetBits() << " != 0 for "
+                   << "\n"
                    << *this << "\n";
       }
       res = false;
@@ -657,8 +670,8 @@ void FieldAccessHistogram::Dump(std::ostream &out) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const TypeTree::Node &node) {
-  os << "|" << node.NameToString(node.GetTypeName()) << " " << " "
-     << node.GetGlobalOffsetBytes() << " " << node.GetSizeBytes() << "|";
+  os << "|" << node.NameToString(node.GetTypeName()) << " "
+     << " " << node.GetGlobalOffsetBytes() << " " << node.GetSizeBytes() << "|";
   return os;
 }
 }  // namespace devtools_crosstool_fdo_field_access

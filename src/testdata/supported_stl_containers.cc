@@ -19,81 +19,67 @@
 #include <queue>
 #include <set>
 #include <stack>
-#include <stdint.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 struct A {
-  uint64_t x;
-  uint64_t y;
-
-  bool operator==(const A &other) const {
-    if (x == other.x && y == other.y)
-      return true;
-    return false;
-  }
-
-  bool operator<(const A &other) const {
-    if (x < other.x)
-      return true;
-    return false;
-  }
-
-  size_t operator()(const A &a) const noexcept { return a.x; };
+  int x;
+  int y;
 };
-
-template <> struct std::hash<A> {
-  std::size_t operator()(const A &a) const noexcept { return a(a); }
+static inline bool operator<(const A& l, const A& r) {
+  return l.x < r.x || (l.x == r.x && l.y < r.y);
+}
+static inline bool operator==(const A& l, const A& r) {
+  return l.x == r.x && l.y == r.y;
+}
+namespace std {
+template <>
+struct hash<A> {
+  size_t operator()(const A& a) const noexcept {
+    return (static_cast<size_t>(a.x) << 32) ^ static_cast<size_t>(a.y);
+  }
 };
+}  // namespace std
 
 int main() {
-  std::vector<A> vector_A;
-  vector_A.push_back(A());
-
-  std::deque<A> deque_A;
-  deque_A.push_back(A());
-
-  std::set<A> set_A;
-  set_A.insert(A());
-
-  std::multiset<A> multiset_A;
-  multiset_A.insert(A());
-
-  std::unordered_set<A> unordered_set_A(0);
-  unordered_set_A.insert(A());
-
-  std::unordered_multiset<A> unordered_multiset_A(0);
-  unordered_multiset_A.insert(A());
-
-  std::forward_list<A> fwd_list_A;
-  fwd_list_A.push_front(A());
-
-  std::list<A> list_A;
-  list_A.push_back(A());
-
-  std::stack<A> stack_A;
-  stack_A.push(A());
-
-  std::queue<A> queue_A;
-  queue_A.push(A());
-
-  std::priority_queue<A> p_queue_A;
-  p_queue_A.push(A());
-
-  std::map<A, A> map_A;
-  map_A.insert({A(), A()});
-
-  std::multimap<A, A> multimap_A;
-  multimap_A.insert({A(), A()});
-
-  std::unordered_map<A, A> unordered_map_A;
-  unordered_map_A.insert({A(), A()});
-
-  std::unordered_multimap<A, A> unordered_multimap_A;
-  unordered_multimap_A.insert({A(), A()});
-
-  std::string string =
-      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+  std::vector<A> v;
+  v.reserve(8);
+  for (int i = 0; i < 8; ++i) v.push_back({i, i + 1});
+  std::deque<A> dq;
+  for (int i = 0; i < 8; ++i) dq.push_back({i, -i});
+  std::list<A> lst;
+  for (int i = 0; i < 8; ++i) lst.push_back({i, i});
+  std::forward_list<A> fl;
+  for (int i = 0; i < 8; ++i) fl.push_front({i, 2 * i});
+  std::map<A, A> mp;
+  for (int i = 0; i < 8; ++i) mp.emplace(A{i, i + 1}, A{i + 2, i + 3});
+  std::multimap<A, A> mmp;
+  for (int i = 0; i < 8; ++i) mmp.emplace(A{i, i}, A{i + 1, i + 1});
+  std::set<A> st;
+  for (int i = 0; i < 8; ++i) st.insert({i, 3 * i});
+  std::multiset<A> mst;
+  for (int i = 0; i < 8; ++i) mst.insert({i, -3 * i});
+  std::unordered_map<A, A> ump;
+  ump.reserve(16);
+  for (int i = 0; i < 8; ++i) ump.emplace(A{i, i}, A{i + 1, i + 2});
+  std::unordered_multimap<A, A> ummp;
+  ummp.reserve(16);
+  for (int i = 0; i < 8; ++i) ummp.emplace(A{i, i}, A{i, i});
+  std::unordered_set<A> ust;
+  ust.reserve(16);
+  for (int i = 0; i < 8; ++i) ust.emplace(A{i, 5 * i});
+  std::unordered_multiset<A> umst;
+  umst.reserve(16);
+  for (int i = 0; i < 8; ++i) umst.emplace(A{i, -5 * i});
+  std::string s(4096, 'x');
+  s += "y";
+  std::queue<A> q;
+  for (int i = 0; i < 8; ++i) q.push({i, i});
+  std::stack<A> sk;
+  for (int i = 0; i < 8; ++i) sk.push({i, i});
+  std::priority_queue<int, std::vector<int>> pq;
+  for (int i = 0; i < 8; ++i) pq.push(i);
+  return 0;
 }

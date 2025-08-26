@@ -1,0 +1,70 @@
+name: llvm-memprof CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+ build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+    - name: Check disk space
+      run: |
+        df -h
+
+    - name: Free disk space
+      run: |
+        set -euxo pipefail
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /usr/share/swift
+        sudo rm -rf /usr/local/.ghcup
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        sudo apt-get clean
+        df -h
+    - name: Checkout (with submodules)
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Environment Setup
+      shell: bash
+      run: |
+        set -euo pipefail
+        ./init.sh --prebuilt-llvm
+        source env.sh
+        bazel --version
+        echo $TOP_DIR
+        echo $SCRIPTS_DIR
+        whereis clang
+        whereis clang++
+        whereis llvm-dwarfdump
+        whereis llvm-symbolizer
+        whereis llvm-profdata
+        whereis lld
+        whereis bazel
+
+    - name: DwarfMetadata Fetcher Test
+      run: |
+        source env.sh
+        bazel run //src:dwarf_metadata_fetcher_test --verbose_failures --sandbox_debug
+
+    - name: Type Resolver Unit Test
+      run: |
+        source env.sh
+        bazel run //src:type_resolver_unit_test --verbose_failures  --sandbox_debug
+
+    - name: Type Resolver Test
+      run: |
+        source env.sh
+        bazel run //src:type_resolver_test --verbose_failures  --sandbox_debug
+   
+    - name: Histogram Builder Test
+      run: |
+        source env.sh
+        bazel run //src:histogram_builder_test --verbose_failures  --sandbox_debug

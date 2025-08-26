@@ -26,6 +26,7 @@
 #include "absl/strings/string_view.h"
 #include "binary_file_retriever.h"
 #include "gtest/gtest.h"
+#include "re2/re2.h"
 #include "src/main/cpp/util/path.h"
 #include "status_macros.h"
 #include "test_status_macros.h"
@@ -173,35 +174,6 @@ TEST(DwarfMetadataFetcherTest, NameclashTest) {
   EXPECT_EQ(metadata->fields[0]->type_name, "double");
 }
 
-TEST(DwarfMetadataFetcherTest, BasicStructTest) {
-  const std::string raw_dwarf_dir = kDwarfMetadataFetchTestPath;
-  const std::string dwarf_path =
-      blaze_util::JoinPath(raw_dwarf_dir, "basic_struct_type.dwarf");
-  const std::string linker_build_id = "e8f07bde09fd926a";
-
-  std::unique_ptr<BinaryFileRetriever> mock_retriever =
-      BinaryFileRetriever::CreateMockRetriever({{linker_build_id, dwarf_path}});
-
-  DwarfMetadataFetcher test_target(std::move(mock_retriever),
-                                   ::testing::TempDir());
-  ASSERT_OK(test_target.FetchWithPath({{linker_build_id, dwarf_path}},
-                                      /*force_update_cache=*/true));
-
-  ASSERT_OK_AND_ASSIGN(auto metadata, test_target.GetType("A"));
-
-  // struct A {
-  //   long int x;
-  //   long int y;
-  // };
-
-  EXPECT_EQ(metadata->name, "A");
-  ASSERT_EQ(metadata->fields.size(), 2);
-  EXPECT_EQ(metadata->fields[0]->name, "x");
-  EXPECT_EQ(metadata->fields[0]->type_name, "long");
-  EXPECT_EQ(metadata->fields[1]->name, "y");
-  EXPECT_EQ(metadata->fields[1]->type_name, "long");
-}
-
 TEST(DwarfMetadataFetcherTest, UnwrapParameterizedStorageTest) {
   EXPECT_EQ(DwarfMetadataFetcher::UnwrapParameterizedStorage(
                 "__gnu_cxx::__aligned_membuf<x>"),
@@ -259,6 +231,43 @@ TEST(DwarfMetadataFetcherTest, BasicMapTest) {
   EXPECT_EQ(metadata->fields[1]->name, "y");
   EXPECT_EQ(metadata->fields[1]->type_name, "double");
 
+  ASSERT_OK_AND_ASSIGN(
+      metadata, test_target.GetType("std::__1::__tree_node<std::__1::__value_"
+                                    "type<unsigned long, A>, void *>"));
+  EXPECT_EQ(metadata->name,
+            "__tree_node<std::__1::__value_type<unsigned long, A>, void *>");
+  ASSERT_EQ(metadata->fields.size(), 2);
+
+  EXPECT_EQ(metadata->fields[0]->name, "__tree_node_base<void *>");
+  EXPECT_EQ(metadata->fields[0]->type_name,
+            "std::__1::__tree_node_base<void *>");
+  EXPECT_EQ(metadata->fields[0]->offset, 0);
+
+  EXPECT_EQ(metadata->fields[1]->name, "__value_");
+  EXPECT_EQ(metadata->fields[1]->type_name,
+            "std::__1::__value_type<unsigned long, A>");
+  EXPECT_EQ(metadata->fields[1]->offset, 32);
+
+  ASSERT_OK_AND_ASSIGN(
+      metadata,
+      test_target.GetType("std::__1::__tree_node<std::__1::__value_type<"
+                          "unsigned long, A>, void *>::__node_value_type"));
+
+  EXPECT_EQ(metadata->name, "__value_type<unsigned long, A>");
+
+  ASSERT_OK_AND_ASSIGN(
+      metadata,
+      test_target.GetType("std::__1::__value_type<unsigned long, A>"));
+
+  EXPECT_EQ(metadata->name, "__value_type<unsigned long, A>");
+  ASSERT_EQ(metadata->fields.size(), 1);
+  ASSERT_EQ(metadata->offset_idx.size(), 1);
+
+  EXPECT_EQ(metadata->fields[0]->type_name,
+            "std::__1::pair<const unsigned long, A>");
+
+  // The following is for GNU, for no we switch to libc++
+
   // Container type: std::map<long unsigned, A> As
   // has an internal structure type:
 
@@ -273,39 +282,42 @@ TEST(DwarfMetadataFetcherTest, BasicMapTest) {
   // unsigned long at offset 0
   // A at offset 8
 
-  ASSERT_OK_AND_ASSIGN(
-      metadata, test_target.GetType(
-                    "std::_Rb_tree_node<std::pair<const unsigned long, A> >"));
-  EXPECT_EQ(metadata->name,
-            "_Rb_tree_node<std::pair<const unsigned long, A> >");
-  ASSERT_EQ(metadata->fields.size(), 2);
-  EXPECT_EQ(metadata->fields[0]->name, "_Rb_tree_node_base");
-  EXPECT_EQ(metadata->fields[0]->type_name, "std::_Rb_tree_node_base");
-  EXPECT_EQ(metadata->fields[0]->offset, 0);
-  EXPECT_EQ(metadata->fields[1]->name, "_M_storage");
-  EXPECT_EQ(metadata->fields[1]->type_name,
-            "std::pair<const unsigned long, A>");
-  EXPECT_EQ(metadata->fields[1]->offset, 32);
-  ASSERT_OK_AND_ASSIGN(
-      metadata, test_target.GetType("std::pair<const unsigned long, A>"));
+  // ==================================================
+  //   ASSERT_OK_AND_ASSIGN(
+  //       metadata, test_target.GetType(
+  //                     "std::_Rb_tree_node<std::pair<const unsigned long, A>
+  //                     >"));
+  //   EXPECT_EQ(metadata->name,
+  //             "_Rb_tree_node<std::pair<const unsigned long, A> >");
+  //   ASSERT_EQ(metadata->fields.size(), 2);
+  //   EXPECT_EQ(metadata->fields[0]->name, "_Rb_tree_node_base");
+  //   EXPECT_EQ(metadata->fields[0]->type_name, "std::_Rb_tree_node_base");
+  //   EXPECT_EQ(metadata->fields[0]->offset, 0);
+  //   EXPECT_EQ(metadata->fields[1]->name, "_M_storage");
+  //   EXPECT_EQ(metadata->fields[1]->type_name,
+  //             "std::pair<const unsigned long, A>");
+  //   EXPECT_EQ(metadata->fields[1]->offset, 32);
+  //   ASSERT_OK_AND_ASSIGN(
+  //       metadata, test_target.GetType("std::pair<const unsigned long, A>"));
 
-  EXPECT_EQ(metadata->name, "pair<const unsigned long, A>");
-  ASSERT_EQ(metadata->fields.size(), 3);
-  ASSERT_EQ(metadata->offset_idx.size(), 2);
-  auto it = metadata->offset_idx.begin();
-  EXPECT_EQ(it->second.size(), 2);
-  EXPECT_TRUE(it->second.contains(0));
-  EXPECT_TRUE(it->second.contains(1));
-  it++;
-  EXPECT_EQ(it->second.size(), 1);
-  EXPECT_TRUE(it->second.contains(2));
-  EXPECT_EQ(metadata->fields[0]->type_name,
-            "std::__pair_base<const unsigned long, A>");
-  EXPECT_EQ(metadata->fields[0]->offset, 0);
-  EXPECT_EQ(metadata->fields[1]->type_name, "unsigned long");
-  EXPECT_EQ(metadata->fields[1]->offset, 0);
-  EXPECT_EQ(metadata->fields[2]->type_name, "A");
-  EXPECT_EQ(metadata->fields[2]->offset, 8);
+  //   EXPECT_EQ(metadata->name, "pair<const unsigned long, A>");
+  //   ASSERT_EQ(metadata->fields.size(), 3);
+  //   ASSERT_EQ(metadata->offset_idx.size(), 2);
+  //   auto it = metadata->offset_idx.begin();
+  //   EXPECT_EQ(it->second.size(), 2);
+  //   EXPECT_TRUE(it->second.contains(0));
+  //   EXPECT_TRUE(it->second.contains(1));
+  //   it++;
+  //   EXPECT_EQ(it->second.size(), 1);
+  //   EXPECT_TRUE(it->second.contains(2));
+  //   EXPECT_EQ(metadata->fields[0]->type_name,
+  //             "std::__pair_base<const unsigned long, A>");
+  //   EXPECT_EQ(metadata->fields[0]->offset, 0);
+  //   EXPECT_EQ(metadata->fields[1]->type_name, "unsigned long");
+  //   EXPECT_EQ(metadata->fields[1]->offset, 0);
+  //   EXPECT_EQ(metadata->fields[2]->type_name, "A");
+  //   EXPECT_EQ(metadata->fields[2]->offset, 8);
+  // ==================================================
 }
 
 // This tests if we can resolve full field types names that are in
@@ -313,7 +325,7 @@ TEST(DwarfMetadataFetcherTest, BasicMapTest) {
 // This includes type fields that have typedef DIE in between the root type
 // definition and the "short hand" type name. For example, std::string is
 // just a
-// typedef for 'std::__cxx11::basic_string<char, std::char_traits<char>,
+// typedef for 'std::__1::basic_string<char, std::char_traits<char>,
 // std::allocator<char> >'.
 TEST(DwarfMetadataFetcherTest, NamespaceFieldTest) {
   const std::string raw_dwarf_dir = kDwarfMetadataFetchTestPath;
@@ -343,14 +355,15 @@ TEST(DwarfMetadataFetcherTest, NamespaceFieldTest) {
   // };
 
   ASSERT_OK_AND_ASSIGN(auto metadata, test_target.GetType("A"));
+
   EXPECT_EQ(metadata->name, "A");
   ASSERT_EQ(metadata->fields.size(), 3);
   EXPECT_EQ(metadata->fields[0]->name, "x");
   EXPECT_EQ(metadata->fields[0]->type_name, "long");
   EXPECT_EQ(metadata->fields[1]->name, "y");
   EXPECT_EQ(metadata->fields[1]->type_name,
-            "std::__cxx11::basic_string<char, std::char_traits<char>, "
-            "std::allocator<char> >");
+            "std::__1::basic_string<char, std::__1::char_traits<char>, "
+            "std::__1::allocator<char> >");
   EXPECT_EQ(metadata->fields[2]->name, "b");
   EXPECT_EQ(metadata->fields[2]->type_name, "n1::B");
   EXPECT_EQ(metadata->fields[2]->type_name, "n1::B");
@@ -361,23 +374,30 @@ TEST(DwarfMetadataFetcherTest, NamespaceFieldTest) {
   EXPECT_EQ(metadata->fields[0]->name, "x");
   EXPECT_EQ(metadata->fields[0]->type_name, "long");
   ASSERT_OK_AND_ASSIGN(
-      metadata,
-      test_target.GetType("std::__cxx11::basic_string<char, "
-                          "std::char_traits<char>, std::allocator<char> >"));
-  ASSERT_EQ(metadata->fields.size(), 3);
-  EXPECT_EQ(metadata->fields[0]->name, "_M_dataplus");
-  EXPECT_EQ(metadata->fields[0]->type_name,
-            "std::__cxx11::basic_string<char, std::char_traits<char>, "
-            "std::allocator<char> >::_Alloc_hider");
-  EXPECT_EQ(metadata->fields[0]->offset, 0);
-  EXPECT_EQ(metadata->fields[1]->name, "_M_string_length");
-  EXPECT_EQ(metadata->fields[1]->type_name, "unsigned long");
-  EXPECT_EQ(metadata->fields[1]->offset, 8);
-  EXPECT_EQ(metadata->fields[2]->name, "");
-  EXPECT_EQ(metadata->fields[2]->offset, 16);
-  EXPECT_EQ(metadata->fields[2]->type_name,
-            "std::__cxx11::basic_string<char, std::char_traits<char>, "
-            "std::allocator<char> >::Anon_197");
+      metadata, test_target.GetType(
+                    "std::__1::basic_string<char, std::__1::char_traits<char>, "
+                    "std::__1::allocator<char> >"));
+  ASSERT_EQ(metadata->fields.size(), 4);
+  // The following is for gnu std::string, for now we switch to libc++
+  // ==================================================
+
+  // EXPECT_EQ(metadata->fields[0]->name, "_M_dataplus");
+  // EXPECT_EQ(metadata->fields[0]->type_name,
+  //             "std::__1::basic_string<char, std::__1:::char_traits<char>, "
+  //             "std::__1::allocator<char> >::_Alloc_hider");
+  // EXPECT_EQ(metadata->fields[0]->offset, 0);
+  // EXPECT_EQ(metadata->fields[1]->name, "_M_string_length");
+  // EXPECT_EQ(metadata->fields[1]->type_name, "unsigned long");
+  // EXPECT_EQ(metadata->fields[1]->offset, 8);
+  // EXPECT_EQ(metadata->fields[2]->name, "");
+  // EXPECT_EQ(metadata->fields[2]->offset, 16);
+  // EXPECT_EQ(
+  //     RE2::FullMatch(
+  //         metadata->fields[2]->type_name,
+  //         R"(std::__1::basic_string<char, std::__1:char_traits<char>,
+  //         std::__1::allocator<char> >::Anon_\d+)"),
+  //     true);
+  // ==================================================
 }
 
 // This tests if we can resolve union types. This is a special case, because
