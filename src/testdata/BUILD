@@ -28,9 +28,8 @@ cc_binary(
 )
 
 cc_binary(
-    name = "heapalloc",
-    srcs = ["heapalloc.cc"],
-    deps = ["//toolchain:memprof_bazel_allocator"],
+    name = "heap_alloc",
+    srcs = ["heap_alloc.cc"],
 )
 
 cc_proto_library(
@@ -46,29 +45,18 @@ proto_library(
 cc_binary(
     name = "supported_adt_containers",
     srcs = ["supported_adt_containers.cc"],
-    deps = [
-        "@llvm-project//llvm:Support",
-        "//toolchain:memprof_bazel_allocator", 
-    ],
-)
-
-cc_binary(
-    name = "supported_stl_containers",
-    srcs = ["supported_stl_containers.cc"],
-    deps = ["//toolchain:memprof_bazel_allocator"],
+    deps = ["@llvm-project//llvm:Support"],
 )
 
 cc_binary(
     name = "supported_abseil_containers",
     srcs = ["supported_abseil_containers.cc"],
     deps = [
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/container",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:fixed_array",
-        "//toolchain:memprof_bazel_allocator",
     ],
 )
 

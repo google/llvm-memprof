@@ -16,23 +16,6 @@ package(default_visibility = ["//visibility:public"])
 
 filegroup(name = "empty")
 
-
-cc_library(
-    name = "memprof_bazel_allocator",
-    srcs = [
-        "memprof_bazel_allocator.cc",
-    ],
-    linkopts = ["-ldl"],
-    # Force this library's .o files to be part of the lowest-level static
-    # link to ensure that its function definitions can override weak
-    # definitions in the MemProf runtime library.
-    linkstatic = 1,
-    visibility = ["//visibility:public"],
-    # deps = ["@llvm-project//compiler-rt:*"],
-    alwayslink = 1,
-)
-
-
 cc_toolchain_suite(
     name = "clang_suite",
     toolchains = {
